@@ -1,85 +1,48 @@
+// ------------------------------------------------------------------
+// Tipos do domínio — Ser Único
+// ------------------------------------------------------------------
+
+export interface AuthUser {
+  id: string
+  name: string
+  email: string
+}
+
 export interface Role {
   id: string
   name: string
-  color: string // hex or tailwind badge color
-  bgLight: string
-  textColor: string
-  borderColor: string
-  description: string
-  isDefault?: boolean
+  color: string
+  bgLight?: string
+  textColor?: string
+  borderColor?: string
+  description?: string
+  sortOrder?: number
 }
-
-export type TaskStatus = 'Pendente' | 'Em andamento' | 'Concluída'
-export type TaskRecurrence = 'Única' | 'Diária' | 'Semanal' | 'Mensal'
 
 export interface Task {
   id: string
   title: string
-  roleId: string // Função responsável
+  roleId: string
   status: TaskStatus
   recurrence: TaskRecurrence
-  assignedCollaboratorId?: string // Responsável atual opcional
-  dueDate: string // YYYY-MM-DD
-  completedAt?: string
+  assignedCollaboratorId?: string | null
+  dueDate: string
   createdAt: string
-}
-
-export type LeadStage = 'Novo' | 'Em Contato' | 'Avaliação' | 'Proposta' | 'Fechado' | 'Perdido'
-
-export type LeadOrigin =
-  | 'Instagram'
-  | 'Google'
-  | 'Indicação'
-  | 'WhatsApp'
-  | 'Site'
-  | 'Facebook'
-  | 'Panfleto'
-  | 'Outro'
-
-export type LeadInterest =
-  | 'Implantes'
-  | 'Aparelho'
-  | 'Lentes de contato'
-  | 'Clareamento'
-  | 'Prótese'
-  | 'Canal'
-  | 'Odontopediatria'
-  | 'Outro'
-
-export type LossReason =
-  | 'Não respondeu'
-  | 'Escolheu outro profissional'
-  | 'Preço'
-  | 'Prazo'
-  | 'Outro'
-
-export type ContactType = 'Ligação' | 'WhatsApp' | 'E-mail' | 'Presencial'
-
-export interface ContactHistoryItem {
-  id: string
-  leadId: string
-  type: ContactType
-  date: string // ISO string or YYYY-MM-DD HH:mm
-  summary: string
-  scriptTitleUsed?: string
-  registeredBy: string
+  completedAt?: string | null
 }
 
 export interface Lead {
   id: string
   name: string
   phone: string
-  origin: LeadOrigin
-  interest: LeadInterest
+  origin: string
+  interest: string
   stage: LeadStage
-  assignedToId?: string // Colaborador ou Dentista ID
-  assignedToName?: string
-  assignedToRole?: string
-  nextAction: string
-  followUpDate: string // YYYY-MM-DD
-  notes?: string
-  lossReason?: LossReason
-  lossNotes?: string
+  assignedToId?: string | null
+  nextAction?: string | null
+  followUpDate?: string | null
+  lossReason?: LossReason | null
+  lossNotes?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -95,36 +58,40 @@ export interface Script {
 export interface Collaborator {
   id: string
   name: string
-  phone: string
-  email: string
-  roleIds: string[] // pode ter múltiplas funções
+  email?: string
+  phone?: string
+  roleId: string
   isActive: boolean
 }
-
-export type DentalSpecialty =
-  | 'Implantodontia'
-  | 'Ortodontia'
-  | 'Endodontia'
-  | 'Dentística'
-  | 'Periodontia'
-  | 'Prótese'
-  | 'Odontopediatria'
-  | 'Cirurgia'
-  | 'Clareamento'
-  | 'Outro'
 
 export interface Dentist {
   id: string
   name: string
   cro?: string
-  phone: string
-  specialties: DentalSpecialty[]
+  phone?: string
+  specialties: string[]
   isActive: boolean
+  createdAt: string
 }
 
-export interface AuthUser {
-  name: string
-  roleId: string
-  roleName: string
-  roleColor: string
+export interface ContactHistoryItem {
+  id: string
+  leadId: string
+  type: string
+  date: string
+  summary: string
+  registeredBy: string
 }
+
+export type TaskStatus = 'Pendente' | 'Em andamento' | 'Concluída'
+
+export type TaskRecurrence = 'Única' | 'Diária' | 'Semanal' | 'Mensal'
+
+export type LeadStage = 'Novo' | 'Em negociação' | 'Fechado' | 'Perdido'
+
+export type LossReason =
+  | 'Preço'
+  | 'Não tem interesse'
+  | 'Sem resposta'
+  | 'Escolheu concorrência'
+  | 'Outro'

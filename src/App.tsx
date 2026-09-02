@@ -1,11 +1,11 @@
-/* Main App Component - Handles routing (using react-router-dom), query client and other providers */
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { AuthProvider } from '@/context/AuthContext'
 import { AppProvider } from '@/context/AppContext'
 
-import Layout from './components/Layout'
+import Login from './pages/Login'
 import Index from './pages/Index'
 import Dashboard from './pages/Dashboard'
 import Tarefas from './pages/Tarefas'
@@ -19,15 +19,16 @@ import NotFound from './pages/NotFound'
 
 const App = () => (
   <BrowserRouter>
-    <AppProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner position="top-right" richColors />
-        <Routes>
-          <Route path="/" element={<Index />} />
+    <AuthProvider>
+      <AppProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner position="top-right" richColors />
+          <Routes>
+            <Route path="/login" element={<Login />} />
 
-          {/* Authenticated Layout Routes */}
-          <Route element={<Layout />}>
+            {/* Rotas autenticadas (o AppContext exige sessão válida) */}
+            <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/tarefas" element={<Tarefas />} />
             <Route path="/crm" element={<Leads />} />
@@ -36,12 +37,12 @@ const App = () => (
             <Route path="/cadastros/funcoes" element={<Funcoes />} />
             <Route path="/cadastros/colaboradores" element={<Colaboradores />} />
             <Route path="/cadastros/dentistas" element={<Dentistas />} />
-          </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </TooltipProvider>
-    </AppProvider>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </TooltipProvider>
+      </AppProvider>
+    </AuthProvider>
   </BrowserRouter>
 )
 
