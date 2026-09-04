@@ -21,6 +21,7 @@ export interface Role {
   description?: string
   sortOrder?: number
   isDefault?: boolean
+  active?: boolean
 }
 
 export interface Task {

@@ -133,7 +133,10 @@ export default function Funcoes() {
     setModalOpen(true)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) {
       setErrorName('O nome da função é obrigatório.')
@@ -141,34 +144,45 @@ export default function Funcoes() {
     }
 
     const colorConfig = PRESET_COLORS[selectedColorIndex]
+    setSubmitting(true)
+    setSubmitError(null)
 
-    if (editingRole) {
-      updateRole(editingRole.id, {
-        name: name.trim(),
-        description: description.trim(),
-        color: colorConfig.color,
-        bgLight: colorConfig.bgLight,
-        textColor: colorConfig.textColor,
-        borderColor: colorConfig.borderColor,
-      })
-    } else {
-      addRole({
-        name: name.trim(),
-        description: description.trim(),
-        color: colorConfig.color,
-        bgLight: colorConfig.bgLight,
-        textColor: colorConfig.textColor,
-        borderColor: colorConfig.borderColor,
-      })
+    try {
+      if (editingRole) {
+        await updateRole(editingRole.id, {
+          name: name.trim(),
+          description: description.trim(),
+          color: colorConfig.color,
+          bgLight: colorConfig.bgLight,
+          textColor: colorConfig.textColor,
+          borderColor: colorConfig.borderColor,
+        })
+      } else {
+        await addRole({
+          name: name.trim(),
+          description: description.trim(),
+          color: colorConfig.color,
+          bgLight: colorConfig.bgLight,
+          textColor: colorConfig.textColor,
+          borderColor: colorConfig.borderColor,
+        })
+      }
+      setModalOpen(false)
+    } catch (err: any) {
+      setSubmitError(err?.message || 'Falha ao salvar função no banco de dados.')
+    } finally {
+      setSubmitting(false)
     }
-
-    setModalOpen(false)
   }
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (roleToDelete) {
-      deleteRole(roleToDelete.id)
-      setRoleToDelete(null)
+      try {
+        await deleteRole(roleToDelete.id)
+        setRoleToDelete(null)
+      } catch (err: any) {
+        alert(`Erro ao desativar função: ${err?.message || 'Falha na operação'}`)
+      }
     }
   }
 
@@ -299,6 +313,11 @@ export default function Funcoes() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
+            {submitError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
+                {submitError}
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="roleName" className="text-xs font-semibold text-slate-700">
                 Nome da função <span className="text-red-500">*</span>
@@ -355,9 +374,10 @@ export default function Funcoes() {
               </Button>
               <Button
                 type="submit"
+                disabled={submitting}
                 className="bg-teal-700 hover:bg-teal-800 text-white font-medium"
               >
-                {editingRole ? 'Salvar Alterações' : 'Criar Função'}
+                {submitting ? 'Salvando...' : editingRole ? 'Salvar Alterações' : 'Criar Função'}
               </Button>
             </DialogFooter>
           </form>

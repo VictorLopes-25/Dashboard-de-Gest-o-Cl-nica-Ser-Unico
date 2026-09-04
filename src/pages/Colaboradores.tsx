@@ -64,6 +64,8 @@ export default function Colaboradores() {
 
   const [errorName, setErrorName] = useState('')
   const [errorRoles, setErrorRoles] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const handleOpenCreate = () => {
     setEditingColab(null)
@@ -96,7 +98,7 @@ export default function Colaboradores() {
     if (errorRoles) setErrorRoles('')
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     let hasError = false
@@ -111,31 +113,44 @@ export default function Colaboradores() {
 
     if (hasError) return
 
-    if (editingColab) {
-      updateCollaborator(editingColab.id, {
-        name: name.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        roleIds: selectedRoleIds,
-        isActive,
-      })
-    } else {
-      addCollaborator({
-        name: name.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        roleIds: selectedRoleIds,
-        isActive,
-      })
-    }
+    setSubmitting(true)
+    setSubmitError(null)
 
-    setModalOpen(false)
+    try {
+      if (editingColab) {
+        await updateCollaborator(editingColab.id, {
+          name: name.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          roleIds: selectedRoleIds,
+          isActive,
+        })
+      } else {
+        await addCollaborator({
+          name: name.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          roleIds: selectedRoleIds,
+          isActive,
+        })
+      }
+
+      setModalOpen(false)
+    } catch (err: any) {
+      setSubmitError(err?.message || 'Falha ao salvar colaborador no banco de dados.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (colabToDelete) {
-      deleteCollaborator(colabToDelete.id)
-      setColabToDelete(null)
+      try {
+        await deleteCollaborator(colabToDelete.id)
+        setColabToDelete(null)
+      } catch (err: any) {
+        alert(`Erro ao remover colaborador: ${err?.message || 'Falha na operação'}`)
+      }
     }
   }
 
@@ -332,6 +347,11 @@ export default function Colaboradores() {
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
+            {submitError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
+                {submitError}
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="colabName" className="text-xs font-semibold text-slate-700">
                 Nome completo <span className="text-red-500">*</span>
@@ -434,9 +454,14 @@ export default function Colaboradores() {
               </Button>
               <Button
                 type="submit"
+                disabled={submitting}
                 className="bg-teal-700 hover:bg-teal-800 text-white font-medium"
               >
-                {editingColab ? 'Salvar Alterações' : 'Cadastrar Colaborador'}
+                {submitting
+                  ? 'Salvando...'
+                  : editingColab
+                    ? 'Salvar Alterações'
+                    : 'Cadastrar Colaborador'}
               </Button>
             </DialogFooter>
           </form>

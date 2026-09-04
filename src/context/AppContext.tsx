@@ -24,57 +24,115 @@ import type {
   TaskRecurrence,
   DentalSpecialty,
 } from '@/types'
+import {
+  fetchFunctions,
+  createFunction,
+  updateFunction,
+  setFunctionActive,
+  type DbFunction,
+} from '@/services/functionsService'
+import {
+  fetchPeople,
+  createPerson,
+  updatePerson,
+  setPersonActive,
+  deletePerson as deletePersonService,
+  type DbPerson,
+} from '@/services/peopleService'
+import {
+  fetchActiveAssignments,
+  syncPersonFunctions,
+  type DbFunctionAssignment,
+} from '@/services/functionAssignmentsService'
+import { fetchAreas, type DbArea } from '@/services/areasService'
 
 export type { AuthUser }
 
-// ------------------------------------------------------------------
-// Mappers: DB row (snake_case) <-> Frontend types (camelCase)
-// ------------------------------------------------------------------
+// Mapa estático de cores/estilos por nome da função para manter a UI consistente
+const ROLE_VISUAL_DEFAULTS: Record<
+  string,
+  { bgLight: string; textColor: string; borderColor: string; description: string }
+> = {
+  Gerência: {
+    bgLight: '#EDE9FE',
+    textColor: '#6D28D9',
+    borderColor: '#C4B5FD',
+    description: 'Gestão estratégica, coordenação geral da clínica e tomadas de decisão.',
+  },
+  Administrativo: {
+    bgLight: '#E0F2FE',
+    textColor: '#0369A1',
+    borderColor: '#7DD3FC',
+    description: 'Operações administrativas, cadastros, compras, contratos e suporte geral.',
+  },
+  Concierge: {
+    bgLight: '#FCE7F3',
+    textColor: '#BE185D',
+    borderColor: '#F9A8D4',
+    description: 'Recepção e acolhimento dos pacientes, experiência do paciente e encaminhamentos.',
+  },
+  'CRC Comercial': {
+    bgLight: '#CCFBF1',
+    textColor: '#0F766E',
+    borderColor: '#5EEAD4',
+    description:
+      'Consultor de Relacionamento com o Cliente — prospecção, qualificação, follow-up e fechamento de leads.',
+  },
+  CRC: {
+    bgLight: '#CCFBF1',
+    textColor: '#0F766E',
+    borderColor: '#5EEAD4',
+    description:
+      'Consultor de Relacionamento com o Cliente — prospecção, qualificação, follow-up e fechamento de leads.',
+  },
+  'ASB Principal I': {
+    bgLight: '#FFEDD5',
+    textColor: '#C2410C',
+    borderColor: '#FDBA74',
+    description:
+      'Auxiliar de Saúde Bucal principal da cirurgia e implantes, esterilização crítica e biossegurança.',
+  },
+  'ASB Auxiliar': {
+    bgLight: '#FEF3C7',
+    textColor: '#B45309',
+    borderColor: '#FCD34D',
+    description:
+      'Auxílio em procedimentos gerais, reposição de materiais nos consultórios e desinfecção.',
+  },
+  Avaliador: {
+    bgLight: '#D1FAE5',
+    textColor: '#047857',
+    borderColor: '#6EE7B7',
+    description:
+      'Dentista responsável pelo primeiro diagnóstico, plano de tratamento integral e apresentação clínica.',
+  },
+  Dentistas: {
+    bgLight: '#E0E7FF',
+    textColor: '#3730A3',
+    borderColor: '#A5B4FC',
+    description:
+      'Corpo clínico de especialistas responsáveis pela execução dos tratamentos odontológicos.',
+  },
+}
 
-function mapDbRole(r: any): Role {
-  return {
-    id: r.id,
-    name: r.name,
-    color: r.color || '#0F766E',
-    bgLight: r.bg_light || '#CCFBF1',
-    textColor: r.text_color || '#0F766E',
-    borderColor: r.border_color || '#5EEAD4',
-    description: r.description || '',
-    sortOrder: r.sort_order ?? 0,
+function mapFunctionToRole(f: DbFunction): Role {
+  const defaults = ROLE_VISUAL_DEFAULTS[f.name] || {
+    bgLight: '#F1F5F9',
+    textColor: '#334155',
+    borderColor: '#CBD5E1',
+    description: '',
   }
-}
 
-function roleToDb(r: Partial<Role>): any {
-  const out: any = {}
-  if (r.name !== undefined) out.name = r.name
-  if (r.color !== undefined) out.color = r.color
-  if (r.bgLight !== undefined) out.bg_light = r.bgLight
-  if (r.textColor !== undefined) out.text_color = r.textColor
-  if (r.borderColor !== undefined) out.border_color = r.borderColor
-  if (r.description !== undefined) out.description = r.description
-  if (r.sortOrder !== undefined) out.sort_order = r.sortOrder
-  return out
-}
-
-function mapDbCollaborator(c: any): Collaborator {
   return {
-    id: c.id,
-    name: c.name,
-    phone: c.phone || '',
-    email: c.email || '',
-    roleIds: Array.isArray(c.role_ids) ? c.role_ids : [],
-    isActive: c.is_active ?? true,
+    id: f.id,
+    name: f.name,
+    color: f.color || '#0F766E',
+    bgLight: defaults.bgLight,
+    textColor: defaults.textColor,
+    borderColor: defaults.borderColor,
+    description: defaults.description,
+    active: f.active,
   }
-}
-
-function collaboratorToDb(c: Partial<Collaborator>): any {
-  const out: any = {}
-  if (c.name !== undefined) out.name = c.name
-  if (c.phone !== undefined) out.phone = c.phone
-  if (c.email !== undefined) out.email = c.email
-  if (c.roleIds !== undefined) out.role_ids = c.roleIds
-  if (c.isActive !== undefined) out.is_active = c.isActive
-  return out
 }
 
 function mapDbDentist(d: any): Dentist {
@@ -334,15 +392,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [currentUser])
 
   // ----------------------------------------------------------------
-  // Carregamento inicial dos dados (mocks/localStorage)
+  // Carregamento dos dados estruturais (Supabase como fonte da verdade)
   // ----------------------------------------------------------------
 
   const refreshData = useCallback(async () => {
-    setLoading(false)
+    setLoading(true)
+    try {
+      // 1. Buscar funções (public.functions)
+      const dbFuncs = await fetchFunctions()
+      const mappedRoles: Role[] = dbFuncs.map(mapFunctionToRole)
+
+      // 2. Buscar pessoas (public.people)
+      const dbPeople = await fetchPeople()
+
+      // 3. Buscar assignments ativos (public.function_assignments)
+      const dbAssignments = await fetchActiveAssignments()
+
+      // Mapear roleIds por pessoa a partir dos assignments ativos
+      const personRolesMap = new Map<string, string[]>()
+      for (const assignment of dbAssignments) {
+        const existing = personRolesMap.get(assignment.person_id) || []
+        existing.push(assignment.function_id)
+        personRolesMap.set(assignment.person_id, existing)
+      }
+
+      const mappedCollaborators: Collaborator[] = dbPeople.map((p) => ({
+        id: p.id,
+        name: p.name,
+        email: '',
+        phone: '',
+        roleIds: personRolesMap.get(p.id) || [],
+        isActive: p.active,
+      }))
+
+      setRoles(mappedRoles)
+      setCollaborators(mappedCollaborators)
+    } catch (err) {
+      console.error('Erro crítico ao carregar dados estruturais do Supabase:', err)
+      // Conforme Regra 7: NÃO fazer fallback silencioso para mocks. Erros claramente sinalizados.
+      throw err
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
-    refreshData()
+    refreshData().catch((err) => {
+      console.error('Falha na inicialização do AppContext:', err)
+    })
   }, [refreshData])
 
   // Helpers
@@ -361,47 +458,137 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   )
 
   // ----------------------------------------------------------------
-  // CRUD — Funções (roles)
+  // CRUD — Funções (public.functions via Supabase)
   // ----------------------------------------------------------------
 
   const addRole = async (roleData: Omit<Role, 'id'>): Promise<Role | null> => {
-    const localRole: Role = {
-      ...roleData,
-      id: `role-local-${Date.now()}`,
+    try {
+      const created = await createFunction({
+        name: roleData.name,
+        color: roleData.color,
+        active: roleData.active ?? true,
+      })
+      const mapped = mapFunctionToRole(created)
+      // Preserva descrições/cores complementares fornecidas na criação
+      mapped.bgLight = roleData.bgLight || mapped.bgLight
+      mapped.textColor = roleData.textColor || mapped.textColor
+      mapped.borderColor = roleData.borderColor || mapped.borderColor
+      mapped.description = roleData.description || mapped.description
+
+      setRoles((prev) => [...prev, mapped])
+      return mapped
+    } catch (err) {
+      console.error('Falha ao adicionar função no Supabase:', err)
+      throw err
     }
-    setRoles((prev) => [...prev, localRole])
-    return localRole
   }
 
   const updateRole = async (id: string, updates: Partial<Role>) => {
-    setRoles((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)))
+    try {
+      const updated = await updateFunction(id, {
+        name: updates.name,
+        color: updates.color,
+        active: updates.active,
+      })
+      setRoles((prev) =>
+        prev.map((r) => {
+          if (r.id !== id) return r
+          return {
+            ...r,
+            ...updates,
+            name: updated.name,
+            color: updated.color || r.color,
+            active: updated.active,
+          }
+        }),
+      )
+    } catch (err) {
+      console.error('Falha ao atualizar função no Supabase:', err)
+      throw err
+    }
   }
 
   const deleteRole = async (id: string) => {
-    setRoles((prev) => prev.filter((r) => r.id !== id))
+    // Regra 2: Não deletar fisicamente funções referenciadas; preferir active=false
+    try {
+      await setFunctionActive(id, false)
+      setRoles((prev) => prev.map((r) => (r.id === id ? { ...r, active: false } : r)))
+    } catch (err) {
+      console.error('Falha ao desativar função no Supabase:', err)
+      throw err
+    }
   }
 
   // ----------------------------------------------------------------
-  // CRUD — Colaboradores
+  // CRUD — Colaboradores (public.people + public.function_assignments)
   // ----------------------------------------------------------------
 
   const addCollaborator = async (
     colabData: Omit<Collaborator, 'id'>,
   ): Promise<Collaborator | null> => {
-    const localColab: Collaborator = {
-      ...colabData,
-      id: `colab-local-${Date.now()}`,
+    try {
+      // 1. Criar pessoa em public.people
+      const createdPerson = await createPerson({
+        name: colabData.name,
+        active: colabData.isActive ?? true,
+      })
+
+      // 2. Se houver funções atribuídas, sincronizar em public.function_assignments
+      if (colabData.roleIds && colabData.roleIds.length > 0) {
+        await syncPersonFunctions(createdPerson.id, colabData.roleIds)
+      }
+
+      const newColab: Collaborator = {
+        id: createdPerson.id,
+        name: createdPerson.name,
+        email: colabData.email || '',
+        phone: colabData.phone || '',
+        roleIds: colabData.roleIds || [],
+        isActive: createdPerson.active,
+      }
+
+      setCollaborators((prev) => [...prev, newColab])
+      return newColab
+    } catch (err) {
+      console.error('Falha ao cadastrar colaborador no Supabase:', err)
+      throw err
     }
-    setCollaborators((prev) => [...prev, localColab])
-    return localColab
   }
 
   const updateCollaborator = async (id: string, updates: Partial<Collaborator>) => {
-    setCollaborators((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)))
+    try {
+      // 1. Atualizar pessoa se nome ou isActive mudou
+      if (updates.name !== undefined || updates.isActive !== undefined) {
+        await updatePerson(id, {
+          name: updates.name,
+          active: updates.isActive,
+        })
+      }
+
+      // 2. Se as funções foram alteradas, sincronizar function_assignments
+      if (updates.roleIds !== undefined) {
+        await syncPersonFunctions(id, updates.roleIds)
+      }
+
+      setCollaborators((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)))
+    } catch (err) {
+      console.error('Falha ao atualizar colaborador no Supabase:', err)
+      throw err
+    }
   }
 
   const deleteCollaborator = async (id: string) => {
-    setCollaborators((prev) => prev.filter((c) => c.id !== id))
+    // Soft delete preferencial em public.people (active = false) + encerramento de assignments
+    try {
+      await syncPersonFunctions(id, [])
+      await setPersonActive(id, false)
+      setCollaborators((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, isActive: false, roleIds: [] } : c)),
+      )
+    } catch (err) {
+      console.error('Falha ao desativar colaborador no Supabase:', err)
+      throw err
+    }
   }
 
   // ----------------------------------------------------------------
@@ -527,10 +714,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setContactHistory((prev) => [localItem, ...prev])
   }
 
-  // Reset dados locais para dados de demonstração
+  // Reset dados locais para dados de demonstração (módulos não conectados recarregam; conectados recarregam do Supabase)
   const resetData = async () => {
-    setRoles(INITIAL_ROLES)
-    setCollaborators(INITIAL_COLLABORATORS)
+    await refreshData()
     setDentists(INITIAL_DENTISTS)
     setTasks(INITIAL_TASKS)
     setLeads(INITIAL_LEADS)
