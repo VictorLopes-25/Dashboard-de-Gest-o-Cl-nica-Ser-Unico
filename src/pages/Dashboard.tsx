@@ -1,42 +1,75 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '@/context/AppContext'
 import { TaskModal } from '@/components/TaskModal'
-import { getTodayDateString } from '@/data/mockData'
 import {
   CheckCircle2,
-  Clock,
   AlertTriangle,
-  Users2,
   CalendarDays,
   Plus,
   ArrowRight,
   TrendingUp,
   Sparkles,
-  Layers,
   Circle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import type { AgendaItem } from '@/types'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const {
     currentUser,
-    tasks,
     roles,
-    leads,
     collaborators,
     agendaItems,
     overdueAgendaItems,
+    loadAgendaWindow,
     toggleTaskCompletion,
   } = useApp()
 
   const [taskModalOpen, setTaskModalOpen] = useState(false)
-  const todayStr = getTodayDateString(0)
+  const [weeklyItems, setWeeklyItems] = useState<AgendaItem[]>([])
 
-  // Greeting based on current hour
+  // Data atual no formato ISO YYYY-MM-DD local
+  const todayStr = useMemo(() => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }, [])
+
+  // Período de 7 dias para Desempenho da Semana (dos últimos 6 dias até hoje inclusive = 7 dias)
+  const weekStartStr = useMemo(() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 6)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }, [])
+
+  // Carregar itens reais da janela de 7 dias via loadAgendaWindow (Supabase)
+  useEffect(() => {
+    let mounted = true
+    loadAgendaWindow(weekStartStr, todayStr)
+      .then((res) => {
+        if (mounted) {
+          setWeeklyItems(res.items)
+        }
+      })
+      .catch((err) => {
+        console.error('Falha ao carregar itens da semana para o Dashboard:', err)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [weekStartStr, todayStr, loadAgendaWindow, agendaItems])
+
+  // Saudação com base no horário
   const currentHour = new Date().getHours()
   let greeting = 'Bom dia'
   if (currentHour >= 12 && currentHour < 18) {
@@ -54,51 +87,41 @@ export default function Dashboard() {
   const capitalizedDate =
     currentDateFormatted.charAt(0).toUpperCase() + currentDateFormatted.slice(1)
 
-  // Current user's role data
+  // Função ativa atual segundo o mecanismo do app
   const userRole = roles.find((r) => r.id === currentUser?.roleId)
   const userRoleId = currentUser?.roleId || ''
 
-  // 1. STATS CALCULATIONS
-  // A) Tarefas de hoje da função do usuário
-  const userRoleAgendaToday = agendaItems.filter((i) => {
-    if (userRoleId && i.functionId && i.functionId !== userRoleId) return false
-    return i.dueDate === todayStr && i.status === 'aberto'
-  })
+  // -------------------------------------------------------------------------
+  // REGRAS DE NEGÓCIO: TOP KPIs REAIS DE agenda_items (sem mock fallback)
+  // -------------------------------------------------------------------------
+  // 1. "Tarefas de hoje": type='tarefa', due_date=CURRENT_DATE, status <> 'cancelado'
+  const todayTaskItems = useMemo(() => {
+    return agendaItems.filter(
+      (i) => i.type === 'tarefa' && i.dueDate === todayStr && i.status !== 'cancelado',
+    )
+  }, [agendaItems, todayStr])
 
-  // B) Concluídas hoje (global ou no escopo do sistema)
-  const completedTodayTasks = agendaItems.filter(
-    (i) => i.status === 'concluido' && i.dueDate === todayStr,
-  )
+  // 2. "Concluídas hoje": as concluídas de hoje (type='tarefa', due_date=CURRENT_DATE, status='concluido')
+  const completedTodayTasks = useMemo(() => {
+    return todayTaskItems.filter((i) => i.status === 'concluido')
+  }, [todayTaskItems])
 
-  // C) Atrasadas
-  const overdueTasks = overdueAgendaItems.filter((i) => i.status === 'aberto')
+  // 3. "Atrasadas": status='aberto' AND due_date < CURRENT_DATE
+  const overdueTasks = useMemo(() => {
+    return overdueAgendaItems.filter((i) => i.status === 'aberto' && i.dueDate < todayStr)
+  }, [overdueAgendaItems, todayStr])
 
-  // D) Follow-ups de hoje (leads com followUpDate <= hoje e não fechados/perdidos)
-  const followUpsToday = leads.filter(
-    (l) => l.stage !== 'Fechado' && l.stage !== 'Perdido' && l.followUpDate <= todayStr,
-  )
+  // Minhas tarefas de hoje: agenda da função do usuário ativo atual (abertas e concluídas)
+  const myTasks = useMemo(() => {
+    return agendaItems.filter((i) => {
+      if (i.type !== 'tarefa') return false
+      if (i.status === 'cancelado') return false
+      if (userRoleId && i.functionId && i.functionId !== userRoleId) return false
+      return i.dueDate === todayStr
+    })
+  }, [agendaItems, userRoleId, todayStr])
 
-  // Minhas tarefas de hoje: agenda da função do usuário logado (pendentes e concluídas hoje)
-  const myTasks = agendaItems.filter((i) => {
-    if (userRoleId && i.functionId && i.functionId !== userRoleId) return false
-    return i.dueDate === todayStr
-  })
-
-  // Recurrence badge color helper
-  const getRecurrenceBadge = (recurrence: string) => {
-    switch (recurrence) {
-      case 'Diária':
-        return 'bg-teal-50 text-teal-700 border-teal-200'
-      case 'Semanal':
-        return 'bg-blue-50 text-blue-700 border-blue-200'
-      case 'Mensal':
-        return 'bg-purple-50 text-purple-700 border-purple-200'
-      default:
-        return 'bg-slate-50 text-slate-600 border-slate-200'
-    }
-  }
-
-  // Get collaborator name
+  // Nome do colaborador
   const getCollaboratorName = (id?: string) => {
     if (!id) return null
     return collaborators.find((c) => c.id === id)?.name
@@ -146,9 +169,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 4 KPI Statistics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Tarefas de Hoje (Função) */}
+      {/* Top KPI Statistics Cards (Sem mock de Follow-ups do CRM, apenas dados reais de agenda_items) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Card 1: Tarefas de hoje */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-teal-300 transition">
           <div
             className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-xs"
@@ -161,13 +184,10 @@ export default function Dashboard() {
           </div>
           <div className="min-w-0">
             <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {userRoleAgendaToday.length}
+              {todayTaskItems.length}
             </div>
-            <p
-              className="text-xs font-medium text-slate-500 truncate"
-              title={`Tarefas de hoje — ${currentUser?.roleName}`}
-            >
-              Tarefas de hoje — {currentUser?.roleName}
+            <p className="text-xs font-medium text-slate-500 truncate" title="Tarefas de hoje">
+              Tarefas de hoje
             </p>
           </div>
         </div>
@@ -195,25 +215,6 @@ export default function Dashboard() {
               {overdueTasks.length}
             </div>
             <p className="text-xs font-medium text-slate-500">Atrasadas</p>
-          </div>
-        </div>
-
-        {/* Card 4: Follow-ups de hoje (Ponte ERP CRM) */}
-        <div
-          onClick={() => navigate('/crm')}
-          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-amber-400 transition cursor-pointer group"
-        >
-          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 group-hover:bg-amber-100 flex items-center justify-center shrink-0 shadow-xs transition">
-            <Users2 className="w-6 h-6" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-bold text-slate-900 tracking-tight">
-                {followUpsToday.length}
-              </span>
-              <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-600 group-hover:translate-x-0.5 transition" />
-            </div>
-            <p className="text-xs font-medium text-slate-500">Follow-ups de hoje</p>
           </div>
         </div>
       </div>
@@ -361,22 +362,24 @@ export default function Dashboard() {
 
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 overflow-y-auto max-h-[460px] pr-1">
             {roles.map((role) => {
-              // Tasks for this role
-              const roleTasks = tasks.filter((t) => t.roleId === role.id)
-              const todayRoleTasks = roleTasks.filter(
-                (t) =>
-                  t.dueDate === todayStr ||
-                  t.recurrence === 'Diária' ||
-                  (t.dueDate < todayStr && t.status !== 'Concluída'),
+              // Regra 3: Cards de função de hoje por função
+              // total_today = COUNT agenda_items WHERE type='tarefa' AND due_date=CURRENT_DATE AND function_id=<função> AND status <> 'cancelado'
+              // completed_today = mesma query AND status='concluido'
+              const roleTodayTasks = agendaItems.filter(
+                (i) =>
+                  i.type === 'tarefa' &&
+                  i.dueDate === todayStr &&
+                  i.functionId === role.id &&
+                  i.status !== 'cancelado',
               )
-              const completedRoleCount = todayRoleTasks.filter(
-                (t) => t.status === 'Concluída',
-              ).length
-              const totalRoleCount = todayRoleTasks.length
-              const progressPct =
-                totalRoleCount > 0 ? Math.round((completedRoleCount / totalRoleCount) * 100) : 100
+              const totalToday = roleTodayTasks.length
+              const completedToday = roleTodayTasks.filter((i) => i.status === 'concluido').length
 
-              const top4Tasks = todayRoleTasks.slice(0, 4)
+              // Regra 3: Se total_today = 0 -> "Sem tarefas cadastradas para hoje" e percentual "—". NUNCA "100% concluído" para 0/0.
+              const progressPct =
+                totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : null
+
+              const top4Tasks = roleTodayTasks.slice(0, 4)
 
               return (
                 <div
@@ -397,13 +400,13 @@ export default function Dashboard() {
                         </span>
                       </div>
                       <span className="text-[11px] font-semibold text-slate-500">
-                        {completedRoleCount}/{totalRoleCount}
+                        {totalToday > 0 ? `${completedToday}/${totalToday}` : '0/0'}
                       </span>
                     </div>
 
-                    {/* Progress bar */}
+                    {/* Progress bar (se total=0, 0%) */}
                     <div className="mt-2.5">
-                      <Progress value={progressPct} className="h-1.5 bg-slate-100" />
+                      <Progress value={progressPct ?? 0} className="h-1.5 bg-slate-100" />
                     </div>
 
                     {/* Top 4 tasks list */}
@@ -422,14 +425,14 @@ export default function Dashboard() {
                               toggleTaskCompletion(t.id)
                             }}
                           >
-                            {t.status === 'Concluída' ? (
+                            {t.status === 'concluido' ? (
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                             ) : (
                               <Circle className="w-3.5 h-3.5 text-slate-300 hover:text-teal-600 shrink-0" />
                             )}
                             <span
                               className={`truncate text-[11px] ${
-                                t.status === 'Concluída'
+                                t.status === 'concluido'
                                   ? 'line-through text-slate-400'
                                   : 'text-slate-700'
                               }`}
@@ -444,7 +447,7 @@ export default function Dashboard() {
                   </div>
 
                   <div className="pt-2.5 mt-2 border-t border-slate-100 text-[11px] font-medium text-slate-400 group-hover:text-teal-700 flex items-center justify-between">
-                    <span>{progressPct}% concluído</span>
+                    <span>{progressPct !== null ? `${progressPct}% concluído` : '—'}</span>
                     <span className="flex items-center gap-0.5">
                       Abrir <ArrowRight className="w-3 h-3" />
                     </span>
@@ -478,18 +481,21 @@ export default function Dashboard() {
         <TooltipProvider>
           <div className="mt-6 space-y-4">
             {roles.map((role) => {
-              const roleTasks = tasks.filter((t) => t.roleId === role.id)
-              const total = roleTasks.length
-              const completed = roleTasks.filter((t) => t.status === 'Concluída').length
-              // Provide realistic base percentage if empty for visual beauty
-              const percentage =
-                total > 0
-                  ? Math.round((completed / total) * 100)
-                  : role.id === 'role-gerencia'
-                    ? 80
-                    : role.id === 'role-crc'
-                      ? 67
-                      : 75
+              // Regra 2: Desempenho semanal por função
+              // expected = COUNT agenda_items WHERE type='tarefa' AND function_id=<função> AND due_date dentro do período de 7 dias selecionado AND status <> 'cancelado'
+              // completed = mesmo conjunto AND status='concluido'
+              // expected > 0 -> performance = completed/expected*100; expected = 0 -> NULL -> UI exibe "—". NUNCA 0/0 = 100%.
+              const roleWeekItems = weeklyItems.filter(
+                (i) =>
+                  i.type === 'tarefa' &&
+                  i.functionId === role.id &&
+                  i.status !== 'cancelado' &&
+                  i.dueDate >= weekStartStr &&
+                  i.dueDate <= todayStr,
+              )
+              const expected = roleWeekItems.length
+              const completed = roleWeekItems.filter((i) => i.status === 'concluido').length
+              const performance = expected > 0 ? Math.round((completed / expected) * 100) : null
 
               return (
                 <div key={role.id} className="space-y-1.5">
@@ -504,11 +510,15 @@ export default function Dashboard() {
 
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="font-bold text-slate-700 cursor-help">{percentage}%</span>
+                        <span className="font-bold text-slate-700 cursor-help">
+                          {performance !== null ? `${performance}%` : '—'}
+                        </span>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="text-xs">
-                          {completed} de {total} tarefas concluídas
+                          {expected > 0
+                            ? `${completed} de ${expected} tarefas concluídas`
+                            : 'Sem tarefas cadastradas no período'}
                         </p>
                       </TooltipContent>
                     </Tooltip>
@@ -519,7 +529,7 @@ export default function Dashboard() {
                     <div
                       className="h-full rounded-full transition-all duration-700 ease-out"
                       style={{
-                        width: `${percentage}%`,
+                        width: `${performance ?? 0}%`,
                         backgroundColor: role.color,
                       }}
                     />

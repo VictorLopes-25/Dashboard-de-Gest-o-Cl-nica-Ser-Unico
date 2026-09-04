@@ -302,34 +302,54 @@ export default function Index() {
               Atalhos de demonstração rápida:
             </p>
             <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => fillDemoUser('Paula Rocha', 'role-crc')}
-                className="text-xs px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-medium flex items-center gap-1 transition"
-              >
-                <UserCheck className="w-3 h-3" /> Paula (CRC)
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemoUser('Marcos Silveira', 'role-gerencia')}
-                className="text-xs px-2.5 py-1 rounded-md bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 font-medium flex items-center gap-1 transition"
-              >
-                <UserCheck className="w-3 h-3" /> Marcos (Gerência)
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemoUser('Camila Albuquerque', 'role-concierge')}
-                className="text-xs px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 font-medium flex items-center gap-1 transition"
-              >
-                <UserCheck className="w-3 h-3" /> Camila (Concierge)
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemoUser('Dr. Rodrigo Mendes', 'role-dentistas')}
-                className="text-xs px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 font-medium flex items-center gap-1 transition"
-              >
-                <UserCheck className="w-3 h-3" /> Dr. Rodrigo (Dentista)
-              </button>
+              {roles.find((r) => r.name.toLowerCase().includes('gerência')) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const r = roles.find((role) => role.name.toLowerCase().includes('gerência'))
+                    if (r) fillDemoUser('Marcos Silveira', r.id)
+                  }}
+                  className="text-xs px-2.5 py-1 rounded-md bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 font-medium flex items-center gap-1 transition"
+                >
+                  <UserCheck className="w-3 h-3" /> Marcos (Gerência)
+                </button>
+              )}
+              {roles.find((r) => r.name.toLowerCase().includes('crc')) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const r = roles.find((role) => role.name.toLowerCase().includes('crc'))
+                    if (r) fillDemoUser('Paula Rocha', r.id)
+                  }}
+                  className="text-xs px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-medium flex items-center gap-1 transition"
+                >
+                  <UserCheck className="w-3 h-3" /> Paula (CRC)
+                </button>
+              )}
+              {roles.find((r) => r.name.toLowerCase().includes('concierge')) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const r = roles.find((role) => role.name.toLowerCase().includes('concierge'))
+                    if (r) fillDemoUser('Camila Albuquerque', r.id)
+                  }}
+                  className="text-xs px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 font-medium flex items-center gap-1 transition"
+                >
+                  <UserCheck className="w-3 h-3" /> Camila (Concierge)
+                </button>
+              )}
+              {roles.find((r) => r.name.toLowerCase().includes('dentista')) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const r = roles.find((role) => role.name.toLowerCase().includes('dentista'))
+                    if (r) fillDemoUser('Dr. Rodrigo Mendes', r.id)
+                  }}
+                  className="text-xs px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 font-medium flex items-center gap-1 transition"
+                >
+                  <UserCheck className="w-3 h-3" /> Dr. Rodrigo (Dentista)
+                </button>
+              )}
             </div>
           </div>
         </div>

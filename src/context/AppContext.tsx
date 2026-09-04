@@ -420,11 +420,11 @@ const AppContext = createContext<AppContextType | undefined>(undefined)
 // ------------------------------------------------------------------
 
 const DEFAULT_CURRENT_USER: AuthUser = {
-  id: 'user-crc-default',
-  name: 'Paula Rocha',
-  roleId: '11111111-1111-4111-8111-111111111104',
-  roleName: 'CRC',
-  roleColor: '#7C3AED',
+  id: 'user-gerencia-default',
+  name: 'Marcos Silveira',
+  roleId: 'b205a7eb-b77a-42df-9d22-1cfbdd97363e',
+  roleName: 'Gerência',
+  roleColor: '#6D28D9',
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -484,6 +484,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // 1. Buscar funções (public.functions)
       const dbFuncs = await fetchFunctions()
       const mappedRoles: Role[] = dbFuncs.map(mapFunctionToRole)
+
+      // Se o usuário ativo estiver usando uma role que não existe mais nas funções do Supabase
+      // ou se o roleId estiver desatualizado, atualiza para a função Gerência do Supabase
+      setCurrentUserState((prev) => {
+        if (!prev) return prev
+        const roleExists = mappedRoles.some((r) => r.id === prev.roleId)
+        if (!roleExists) {
+          const gerenciaRole =
+            mappedRoles.find((r) => r.name.toLowerCase().includes('gerência')) || mappedRoles[0]
+          if (gerenciaRole) {
+            const updatedUser: AuthUser = {
+              ...prev,
+              roleId: gerenciaRole.id,
+              roleName: gerenciaRole.name,
+              roleColor: gerenciaRole.color,
+            }
+            try {
+              localStorage.setItem('ser_unico_current_user', JSON.stringify(updatedUser))
+            } catch {
+              // ignore
+            }
+            return updatedUser
+          }
+        }
+        return prev
+      })
 
       // 2. Buscar pessoas (public.people)
       const dbPeople = await fetchPeople()
