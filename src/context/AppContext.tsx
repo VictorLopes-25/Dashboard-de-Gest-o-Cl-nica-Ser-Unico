@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
-import { supabase } from '@/lib/supabase/client'
 import {
   INITIAL_ROLES,
   INITIAL_COLLABORATORS,
@@ -335,48 +334,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [currentUser])
 
   // ----------------------------------------------------------------
-  // Carregamento inicial dos dados com fallback elegante
+  // Carregamento inicial dos dados (mocks/localStorage)
   // ----------------------------------------------------------------
 
   const refreshData = useCallback(async () => {
-    try {
-      const [rolesRes, colabsRes, dentistsRes, tasksRes, leadsRes, scriptsRes, historyRes] =
-        await Promise.all([
-          supabase.from('roles').select('*').order('sort_order'),
-          supabase.from('collaborators').select('*').order('name'),
-          supabase.from('dentists').select('*').order('name'),
-          supabase.from('tasks').select('*').order('created_at', { ascending: false }),
-          supabase.from('leads').select('*').order('created_at', { ascending: false }),
-          supabase.from('scripts').select('*').order('title'),
-          supabase.from('contact_history').select('*').order('date', { ascending: false }),
-        ])
-
-      if (rolesRes.data && rolesRes.data.length > 0) {
-        setRoles(rolesRes.data.map(mapDbRole))
-      }
-      if (colabsRes.data && colabsRes.data.length > 0) {
-        setCollaborators(colabsRes.data.map(mapDbCollaborator))
-      }
-      if (dentistsRes.data && dentistsRes.data.length > 0) {
-        setDentists(dentistsRes.data.map(mapDbDentist))
-      }
-      if (tasksRes.data && tasksRes.data.length > 0) {
-        setTasks(tasksRes.data.map(mapDbTask))
-      }
-      if (leadsRes.data && leadsRes.data.length > 0) {
-        setLeads(leadsRes.data.map(mapDbLead))
-      }
-      if (scriptsRes.data && scriptsRes.data.length > 0) {
-        setScripts(scriptsRes.data.map(mapDbScript))
-      }
-      if (historyRes.data && historyRes.data.length > 0) {
-        setContactHistory(historyRes.data.map(mapDbContactHistory))
-      }
-    } catch {
-      // Fallback permanece com os dados iniciais
-    } finally {
-      setLoading(false)
-    }
+    setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -403,17 +365,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ----------------------------------------------------------------
 
   const addRole = async (roleData: Omit<Role, 'id'>): Promise<Role | null> => {
-    try {
-      const payload = roleToDb(roleData)
-      const { data, error } = await supabase.from('roles').insert(payload).select().single()
-      if (!error && data) {
-        const created = mapDbRole(data)
-        setRoles((prev) => [...prev, created])
-        return created
-      }
-    } catch {
-      // fallback local
-    }
     const localRole: Role = {
       ...roleData,
       id: `role-local-${Date.now()}`,
@@ -424,20 +375,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateRole = async (id: string, updates: Partial<Role>) => {
     setRoles((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)))
-    try {
-      await supabase.from('roles').update(roleToDb(updates)).eq('id', id)
-    } catch {
-      // ignore
-    }
   }
 
   const deleteRole = async (id: string) => {
     setRoles((prev) => prev.filter((r) => r.id !== id))
-    try {
-      await supabase.from('roles').delete().eq('id', id)
-    } catch {
-      // ignore
-    }
   }
 
   // ----------------------------------------------------------------
@@ -447,17 +388,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addCollaborator = async (
     colabData: Omit<Collaborator, 'id'>,
   ): Promise<Collaborator | null> => {
-    try {
-      const payload = collaboratorToDb(colabData)
-      const { data, error } = await supabase.from('collaborators').insert(payload).select().single()
-      if (!error && data) {
-        const created = mapDbCollaborator(data)
-        setCollaborators((prev) => [...prev, created])
-        return created
-      }
-    } catch {
-      // fallback local
-    }
     const localColab: Collaborator = {
       ...colabData,
       id: `colab-local-${Date.now()}`,
@@ -468,20 +398,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateCollaborator = async (id: string, updates: Partial<Collaborator>) => {
     setCollaborators((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)))
-    try {
-      await supabase.from('collaborators').update(collaboratorToDb(updates)).eq('id', id)
-    } catch {
-      // ignore
-    }
   }
 
   const deleteCollaborator = async (id: string) => {
     setCollaborators((prev) => prev.filter((c) => c.id !== id))
-    try {
-      await supabase.from('collaborators').delete().eq('id', id)
-    } catch {
-      // ignore
-    }
   }
 
   // ----------------------------------------------------------------
@@ -489,17 +409,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ----------------------------------------------------------------
 
   const addDentist = async (dentistData: Omit<Dentist, 'id'>): Promise<Dentist | null> => {
-    try {
-      const payload = dentistToDb(dentistData)
-      const { data, error } = await supabase.from('dentists').insert(payload).select().single()
-      if (!error && data) {
-        const created = mapDbDentist(data)
-        setDentists((prev) => [...prev, created])
-        return created
-      }
-    } catch {
-      // fallback local
-    }
     const localDentist: Dentist = {
       ...dentistData,
       id: `dentist-local-${Date.now()}`,
@@ -510,20 +419,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateDentist = async (id: string, updates: Partial<Dentist>) => {
     setDentists((prev) => prev.map((d) => (d.id === id ? { ...d, ...updates } : d)))
-    try {
-      await supabase.from('dentists').update(dentistToDb(updates)).eq('id', id)
-    } catch {
-      // ignore
-    }
   }
 
   const deleteDentist = async (id: string) => {
     setDentists((prev) => prev.filter((d) => d.id !== id))
-    try {
-      await supabase.from('dentists').delete().eq('id', id)
-    } catch {
-      // ignore
-    }
   }
 
   // ----------------------------------------------------------------
@@ -531,17 +430,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ----------------------------------------------------------------
 
   const addTask = async (taskData: Omit<Task, 'id' | 'createdAt'>): Promise<Task | null> => {
-    try {
-      const payload = taskToDb(taskData)
-      const { data, error } = await supabase.from('tasks').insert(payload).select().single()
-      if (!error && data) {
-        const created = mapDbTask(data)
-        setTasks((prev) => [created, ...prev])
-        return created
-      }
-    } catch {
-      // fallback local
-    }
     const localTask: Task = {
       ...taskData,
       id: `task-local-${Date.now()}`,
@@ -553,20 +441,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateTask = async (id: string, updates: Partial<Task>) => {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)))
-    try {
-      await supabase.from('tasks').update(taskToDb(updates)).eq('id', id)
-    } catch {
-      // ignore
-    }
   }
 
   const deleteTask = async (id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id))
-    try {
-      await supabase.from('tasks').delete().eq('id', id)
-    } catch {
-      // ignore
-    }
   }
 
   const toggleTaskCompletion = async (id: string) => {
@@ -585,17 +463,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addLead = async (
     leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>,
   ): Promise<Lead | null> => {
-    try {
-      const payload = leadToDb(leadData)
-      const { data, error } = await supabase.from('leads').insert(payload).select().single()
-      if (!error && data) {
-        const created = mapDbLead(data)
-        setLeads((prev) => [created, ...prev])
-        return created
-      }
-    } catch {
-      // fallback local
-    }
     const now = new Date().toISOString()
     const localLead: Lead = {
       ...leadData,
@@ -609,20 +476,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateLead = async (id: string, updates: Partial<Lead>) => {
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updates } : l)))
-    try {
-      await supabase.from('leads').update(leadToDb(updates)).eq('id', id)
-    } catch {
-      // ignore
-    }
   }
 
   const deleteLead = async (id: string) => {
     setLeads((prev) => prev.filter((l) => l.id !== id))
-    try {
-      await supabase.from('leads').delete().eq('id', id)
-    } catch {
-      // ignore
-    }
   }
 
   const moveLeadStage = async (
@@ -645,17 +502,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addScript = async (
     scriptData: Omit<Script, 'id' | 'updatedAt'>,
   ): Promise<Script | null> => {
-    try {
-      const payload = scriptToDb(scriptData)
-      const { data, error } = await supabase.from('scripts').insert(payload).select().single()
-      if (!error && data) {
-        const created = mapDbScript(data)
-        setScripts((prev) => [created, ...prev])
-        return created
-      }
-    } catch {
-      // fallback local
-    }
     const localScript: Script = {
       ...scriptData,
       id: `script-local-${Date.now()}`,
@@ -667,20 +513,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateScript = async (id: string, updates: Partial<Script>) => {
     setScripts((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)))
-    try {
-      await supabase.from('scripts').update(scriptToDb(updates)).eq('id', id)
-    } catch {
-      // ignore
-    }
   }
 
   const deleteScript = async (id: string) => {
     setScripts((prev) => prev.filter((s) => s.id !== id))
-    try {
-      await supabase.from('scripts').delete().eq('id', id)
-    } catch {
-      // ignore
-    }
   }
 
   const addContactHistory = async (item: Omit<ContactHistoryItem, 'id'>) => {
@@ -689,11 +525,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: `hist-local-${Date.now()}`,
     }
     setContactHistory((prev) => [localItem, ...prev])
-    try {
-      await supabase.from('contact_history').insert(contactHistoryToDb(item))
-    } catch {
-      // ignore
-    }
   }
 
   // Reset dados locais para dados de demonstração
