@@ -1,171 +1,446 @@
 // AVOID UPDATING THIS FILE DIRECTLY. It is automatically generated.
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: '14.5'
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
-      collaborators: {
+      agenda_items: {
         Row: {
+          completed_at: string | null
           created_at: string
-          email: string | null
+          due_date: string
+          due_time: string | null
+          feedback: string | null
+          function_id: string | null
           id: string
-          is_active: boolean
-          name: string
-          phone: string | null
-          role_ids: string[]
+          notes: string | null
+          organization_id: string
+          person_id: string | null
+          source_id: string | null
+          source_type: string | null
+          status: Database["public"]["Enums"]["agenda_item_status"]
+          title: string
+          transferred: boolean
+          type: Database["public"]["Enums"]["agenda_item_type"]
         }
         Insert: {
+          completed_at?: string | null
           created_at?: string
-          email?: string | null
+          due_date: string
+          due_time?: string | null
+          feedback?: string | null
+          function_id?: string | null
           id?: string
-          is_active?: boolean
-          name: string
-          phone?: string | null
-          role_ids?: string[]
+          notes?: string | null
+          organization_id: string
+          person_id?: string | null
+          source_id?: string | null
+          source_type?: string | null
+          status?: Database["public"]["Enums"]["agenda_item_status"]
+          title: string
+          transferred?: boolean
+          type: Database["public"]["Enums"]["agenda_item_type"]
         }
         Update: {
+          completed_at?: string | null
           created_at?: string
-          email?: string | null
+          due_date?: string
+          due_time?: string | null
+          feedback?: string | null
+          function_id?: string | null
           id?: string
-          is_active?: boolean
-          name?: string
-          phone?: string | null
-          role_ids?: string[]
-        }
-        Relationships: []
-      }
-      contact_history: {
-        Row: {
-          created_at: string
-          date: string
-          id: string
-          lead_id: string
-          registered_by: string | null
-          script_title_used: string | null
-          summary: string
-          type: string
-        }
-        Insert: {
-          created_at?: string
-          date?: string
-          id?: string
-          lead_id: string
-          registered_by?: string | null
-          script_title_used?: string | null
-          summary: string
-          type?: string
-        }
-        Update: {
-          created_at?: string
-          date?: string
-          id?: string
-          lead_id?: string
-          registered_by?: string | null
-          script_title_used?: string | null
-          summary?: string
-          type?: string
+          notes?: string | null
+          organization_id?: string
+          person_id?: string | null
+          source_id?: string | null
+          source_type?: string | null
+          status?: Database["public"]["Enums"]["agenda_item_status"]
+          title?: string
+          transferred?: boolean
+          type?: Database["public"]["Enums"]["agenda_item_type"]
         }
         Relationships: [
           {
-            foreignKeyName: 'contact_history_lead_id_fkey'
-            columns: ['lead_id']
+            foreignKeyName: "agenda_items_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'leads'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_agenda_function"
+            columns: ["function_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "functions"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "fk_agenda_person"
+            columns: ["person_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id", "organization_id"]
           },
         ]
       }
-      dentists: {
+      areas: {
         Row: {
-          created_at: string
-          cro: string | null
+          active: boolean
+          function_id: string
           id: string
-          is_active: boolean
           name: string
-          phone: string | null
-          specialties: string[]
+          organization_id: string
         }
         Insert: {
-          created_at?: string
-          cro?: string | null
+          active?: boolean
+          function_id: string
           id?: string
-          is_active?: boolean
           name: string
-          phone?: string | null
-          specialties?: string[]
+          organization_id: string
         }
         Update: {
-          created_at?: string
-          cro?: string | null
+          active?: boolean
+          function_id?: string
           id?: string
-          is_active?: boolean
           name?: string
-          phone?: string | null
-          specialties?: string[]
+          organization_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "areas_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_areas_function"
+            columns: ["function_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "functions"
+            referencedColumns: ["id", "organization_id"]
+          },
+        ]
+      }
+      function_assignments: {
+        Row: {
+          active: boolean
+          created_at: string
+          end_date: string | null
+          function_id: string
+          id: string
+          organization_id: string
+          person_id: string
+          start_date: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          end_date?: string | null
+          function_id: string
+          id?: string
+          organization_id: string
+          person_id: string
+          start_date?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          end_date?: string | null
+          function_id?: string
+          id?: string
+          organization_id?: string
+          person_id?: string
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_fa_function"
+            columns: ["function_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "functions"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "fk_fa_person"
+            columns: ["person_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "function_assignments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      functions: {
+        Row: {
+          active: boolean
+          color: string | null
+          created_at: string
+          id: string
+          name: string
+          organization_id: string
+        }
+        Insert: {
+          active?: boolean
+          color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          organization_id: string
+        }
+        Update: {
+          active?: boolean
+          color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "functions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_contacts: {
+        Row: {
+          channel: string | null
+          contact_date: string
+          created_at: string
+          id: string
+          lead_id: string
+          notes: string | null
+          organization_id: string
+          person_id: string | null
+        }
+        Insert: {
+          channel?: string | null
+          contact_date?: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          notes?: string | null
+          organization_id: string
+          person_id?: string | null
+        }
+        Update: {
+          channel?: string | null
+          contact_date?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          organization_id?: string
+          person_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_lc_lead"
+            columns: ["lead_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "fk_lc_person"
+            columns: ["person_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "lead_contacts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       leads: {
         Row: {
-          assigned_to_id: string | null
-          assigned_to_name: string | null
-          assigned_to_role: string | null
+          campaign: string | null
+          closed_at: string | null
+          commercial_function_id: string | null
+          commercial_person_id: string | null
           created_at: string
-          follow_up_date: string | null
+          evaluation_completed_at: string | null
+          evaluation_scheduled_at: string | null
+          evaluator_person_id: string | null
           id: string
-          interest: string
-          loss_notes: string | null
-          loss_reason: string | null
+          lost_at: string | null
+          lost_reason: string | null
           name: string
           next_action: string | null
-          notes: string | null
-          origin: string
-          phone: string
-          stage: string
-          updated_at: string
+          next_contact_at: string | null
+          organization_id: string
+          origin: Database["public"]["Enums"]["lead_origin"]
+          phone: string | null
+          referred_by_lead_id: string | null
+          referred_by_name: string | null
+          sale_date: string | null
+          sale_value: number | null
+          stage: Database["public"]["Enums"]["lead_stage"]
         }
         Insert: {
-          assigned_to_id?: string | null
-          assigned_to_name?: string | null
-          assigned_to_role?: string | null
+          campaign?: string | null
+          closed_at?: string | null
+          commercial_function_id?: string | null
+          commercial_person_id?: string | null
           created_at?: string
-          follow_up_date?: string | null
+          evaluation_completed_at?: string | null
+          evaluation_scheduled_at?: string | null
+          evaluator_person_id?: string | null
           id?: string
-          interest?: string
-          loss_notes?: string | null
-          loss_reason?: string | null
+          lost_at?: string | null
+          lost_reason?: string | null
           name: string
           next_action?: string | null
-          notes?: string | null
-          origin?: string
-          phone: string
-          stage?: string
-          updated_at?: string
+          next_contact_at?: string | null
+          organization_id: string
+          origin?: Database["public"]["Enums"]["lead_origin"]
+          phone?: string | null
+          referred_by_lead_id?: string | null
+          referred_by_name?: string | null
+          sale_date?: string | null
+          sale_value?: number | null
+          stage?: Database["public"]["Enums"]["lead_stage"]
         }
         Update: {
-          assigned_to_id?: string | null
-          assigned_to_name?: string | null
-          assigned_to_role?: string | null
+          campaign?: string | null
+          closed_at?: string | null
+          commercial_function_id?: string | null
+          commercial_person_id?: string | null
           created_at?: string
-          follow_up_date?: string | null
+          evaluation_completed_at?: string | null
+          evaluation_scheduled_at?: string | null
+          evaluator_person_id?: string | null
           id?: string
-          interest?: string
-          loss_notes?: string | null
-          loss_reason?: string | null
+          lost_at?: string | null
+          lost_reason?: string | null
           name?: string
           next_action?: string | null
-          notes?: string | null
-          origin?: string
-          phone?: string
-          stage?: string
-          updated_at?: string
+          next_contact_at?: string | null
+          organization_id?: string
+          origin?: Database["public"]["Enums"]["lead_origin"]
+          phone?: string | null
+          referred_by_lead_id?: string | null
+          referred_by_name?: string | null
+          sale_date?: string | null
+          sale_value?: number | null
+          stage?: Database["public"]["Enums"]["lead_stage"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_leads_commercial_function"
+            columns: ["commercial_function_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "functions"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "fk_leads_commercial_person"
+            columns: ["commercial_person_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "fk_leads_evaluator"
+            columns: ["evaluator_person_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "fk_leads_referred_by"
+            columns: ["referred_by_lead_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "leads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
         }
         Relationships: []
+      }
+      people: {
+        Row: {
+          active: boolean
+          auth_user_id: string | null
+          created_at: string
+          id: string
+          name: string
+          organization_id: string
+        }
+        Insert: {
+          active?: boolean
+          auth_user_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          organization_id: string
+        }
+        Update: {
+          active?: boolean
+          auth_user_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "people_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -194,117 +469,160 @@ export type Database = {
         }
         Relationships: []
       }
-      roles: {
-        Row: {
-          bg_light: string
-          border_color: string
-          color: string
-          created_at: string
-          description: string | null
-          id: string
-          is_default: boolean
-          name: string
-          sort_order: number
-          text_color: string
-        }
-        Insert: {
-          bg_light?: string
-          border_color?: string
-          color?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_default?: boolean
-          name: string
-          sort_order?: number
-          text_color?: string
-        }
-        Update: {
-          bg_light?: string
-          border_color?: string
-          color?: string
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_default?: boolean
-          name?: string
-          sort_order?: number
-          text_color?: string
-        }
-        Relationships: []
-      }
       scripts: {
         Row: {
-          content: string
+          active: boolean
+          content: string | null
           id: string
-          stage: string
+          organization_id: string
+          stage: string | null
           title: string
           updated_at: string
         }
         Insert: {
-          content: string
+          active?: boolean
+          content?: string | null
           id?: string
-          stage?: string
+          organization_id: string
+          stage?: string | null
           title: string
           updated_at?: string
         }
         Update: {
-          content?: string
+          active?: boolean
+          content?: string | null
           id?: string
-          stage?: string
+          organization_id?: string
+          stage?: string | null
           title?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "scripts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tasks: {
         Row: {
-          assigned_collaborator_id: string | null
-          completed_at: string | null
+          active: boolean
+          area_id: string | null
           created_at: string
-          due_date: string
+          default_person_id: string | null
+          description: string | null
+          due_date: string | null
+          function_id: string | null
           id: string
-          recurrence: string
-          role_id: string
-          status: string
+          organization_id: string
+          recurrence: Database["public"]["Enums"]["recurrence_type"]
+          recurrence_day: number | null
           title: string
         }
         Insert: {
-          assigned_collaborator_id?: string | null
-          completed_at?: string | null
+          active?: boolean
+          area_id?: string | null
           created_at?: string
-          due_date?: string
+          default_person_id?: string | null
+          description?: string | null
+          due_date?: string | null
+          function_id?: string | null
           id?: string
-          recurrence?: string
-          role_id: string
-          status?: string
+          organization_id: string
+          recurrence?: Database["public"]["Enums"]["recurrence_type"]
+          recurrence_day?: number | null
           title: string
         }
         Update: {
-          assigned_collaborator_id?: string | null
-          completed_at?: string | null
+          active?: boolean
+          area_id?: string | null
           created_at?: string
-          due_date?: string
+          default_person_id?: string | null
+          description?: string | null
+          due_date?: string | null
+          function_id?: string | null
           id?: string
-          recurrence?: string
-          role_id?: string
-          status?: string
+          organization_id?: string
+          recurrence?: Database["public"]["Enums"]["recurrence_type"]
+          recurrence_day?: number | null
           title?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'tasks_assigned_collaborator_id_fkey'
-            columns: ['assigned_collaborator_id']
+            foreignKeyName: "fk_tasks_area"
+            columns: ["area_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'collaborators'
-            referencedColumns: ['id']
+            referencedRelation: "areas"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'tasks_role_id_fkey'
-            columns: ['role_id']
+            foreignKeyName: "fk_tasks_function"
+            columns: ["function_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'roles'
-            referencedColumns: ['id']
+            referencedRelation: "functions"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "fk_tasks_person"
+            columns: ["default_person_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "tasks_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      treatments: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          lead_id: string
+          name: string
+          organization_id: string
+          status: Database["public"]["Enums"]["treatment_status"]
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          lead_id: string
+          name: string
+          organization_id: string
+          status?: Database["public"]["Enums"]["treatment_status"]
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          lead_id?: string
+          name?: string
+          organization_id?: string
+          status?: Database["public"]["Enums"]["treatment_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_treatment_lead"
+            columns: ["lead_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id", "organization_id"]
+          },
+          {
+            foreignKeyName: "treatments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -316,7 +634,37 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      agenda_item_status: "aberto" | "concluido" | "cancelado"
+      agenda_item_type:
+        | "tarefa"
+        | "compromisso"
+        | "follow_up"
+        | "pos_venda"
+        | "pendencia"
+      lead_origin:
+        | "indicacao"
+        | "meta_ads"
+        | "google"
+        | "organico"
+        | "reativacao"
+        | "campanha"
+        | "parceiro"
+        | "outros"
+      lead_stage:
+        | "novo"
+        | "avaliacao_agendada"
+        | "nao_compareceu"
+        | "avaliacao_realizada"
+        | "proposta_enviada"
+        | "fechado"
+        | "perdido"
+      recurrence_type:
+        | "pontual"
+        | "diaria"
+        | "semanal"
+        | "mensal"
+        | "data_especifica"
+      treatment_status: "em_andamento" | "concluido" | "cancelado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -324,31 +672,33 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
-    : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
-    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -357,23 +707,23 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -382,23 +732,23 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -407,40 +757,77 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema['Enums']
+    | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
-    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema['CompositeTypes']
+    | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
-    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      agenda_item_status: ["aberto", "concluido", "cancelado"],
+      agenda_item_type: [
+        "tarefa",
+        "compromisso",
+        "follow_up",
+        "pos_venda",
+        "pendencia",
+      ],
+      lead_origin: [
+        "indicacao",
+        "meta_ads",
+        "google",
+        "organico",
+        "reativacao",
+        "campanha",
+        "parceiro",
+        "outros",
+      ],
+      lead_stage: [
+        "novo",
+        "avaliacao_agendada",
+        "nao_compareceu",
+        "avaliacao_realizada",
+        "proposta_enviada",
+        "fechado",
+        "perdido",
+      ],
+      recurrence_type: [
+        "pontual",
+        "diaria",
+        "semanal",
+        "mensal",
+        "data_especifica",
+      ],
+      treatment_status: ["em_andamento", "concluido", "cancelado"],
+    },
   },
 } as const
+
