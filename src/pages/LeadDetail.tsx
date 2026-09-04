@@ -104,25 +104,34 @@ export default function LeadDetail() {
   const phoneNumbersOnly = lead.phone.replace(/\D/g, '')
 
   // Check if overdue
+  const currentDueDate = lead.nextContactAt || lead.followUpDate || ''
   const isOverdue =
-    lead.followUpDate < todayStr && lead.stage !== 'Fechado' && lead.stage !== 'Perdido'
+    currentDueDate &&
+    currentDueDate < todayStr &&
+    lead.stage !== 'fechado' &&
+    lead.stage !== 'perdido'
 
   // Open Edit Action Modal
   const handleOpenEditAction = () => {
     setEditNextAction(lead.nextAction)
-    setEditFollowUpDate(lead.followUpDate)
+    setEditFollowUpDate(currentDueDate || todayStr)
     setEditActionModalOpen(true)
   }
 
-  const handleSaveNextAction = (e: React.FormEvent) => {
+  const handleSaveNextAction = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editNextAction.trim() || !editFollowUpDate) return
 
-    updateLead(lead.id, {
-      nextAction: editNextAction.trim(),
-      followUpDate: editFollowUpDate,
-    })
-    setEditActionModalOpen(false)
+    try {
+      await updateLead(lead.id, {
+        nextAction: editNextAction.trim(),
+        nextContactAt: editFollowUpDate,
+        followUpDate: editFollowUpDate,
+      })
+      setEditActionModalOpen(false)
+    } catch (err: any) {
+      alert(err.message || 'Falha ao atualizar próxima ação.')
+    }
   }
 
   // Open Contact Register Modal
@@ -148,40 +157,52 @@ export default function LeadDetail() {
     }
   }
 
-  const handleSaveContact = (e: React.FormEvent) => {
+  const handleSaveContact = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!contactSummary.trim()) return
 
-    addContactHistory({
-      leadId: lead.id,
-      type: contactType,
-      date:
-        contactDateTime ||
-        `${getTodayDateString(0)} ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
-      summary: contactSummary.trim(),
-      scriptTitleUsed: scriptUsedTitle || undefined,
-      registeredBy: currentUser?.name || 'CRC Ser Único',
-    })
+    try {
+      await addContactHistory({
+        leadId: lead.id,
+        type: contactType,
+        date: new Date().toISOString(),
+        summary: contactSummary.trim(),
+        scriptTitleUsed: scriptUsedTitle || undefined,
+        registeredBy: currentUser?.name || 'CRC Ser Único',
+        personId: currentUser?.id || null,
+      })
 
-    setContactModalOpen(false)
-  }
-
-  // Handle stage change
-  const handleStageClick = (targetStage: LeadStage) => {
-    if (targetStage === lead.stage) return
-
-    if (targetStage === 'Perdido') {
-      setLossModalOpen(true)
-    } else {
-      moveLeadStage(lead.id, targetStage)
+      setContactModalOpen(false)
+    } catch (err: any) {
+      alert(err.message || 'Falha ao salvar contato.')
     }
   }
 
-  const handleConfirmLoss = (reason: any, notes?: string) => {
-    moveLeadStage(lead.id, 'Perdido', {
-      lossReason: reason,
-      lossNotes: notes,
-    })
+  // Handle stage change
+  const handleStageClick = async (targetStage: LeadStage) => {
+    if (targetStage === lead.stage) return
+
+    if (targetStage === 'perdido') {
+      setLossModalOpen(true)
+    } else {
+      try {
+        await moveLeadStage(lead.id, targetStage)
+      } catch (err: any) {
+        alert(err.message || 'Falha ao mover estágio.')
+      }
+    }
+  }
+
+  const handleConfirmLoss = async (reason: any, notes?: string) => {
+    try {
+      await moveLeadStage(lead.id, 'perdido', {
+        lossReason: reason,
+        lossNotes: notes,
+      })
+      setLossModalOpen(false)
+    } catch (err: any) {
+      alert(err.message || 'Falha ao registrar perda.')
+    }
   }
 
   const getContactIcon = (type: string) => {
@@ -484,13 +505,24 @@ export default function LeadDetail() {
               })}
             </div>
 
-            {lead.stage === 'Perdido' && lead.lossReason && (
+            {lead.stage === 'perdido' && (lead.lostReason || lead.lossReason) && (
               <div className="mt-3 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 space-y-1">
                 <p className="font-bold">Motivo da perda:</p>
-                <p>{lead.lossReason}</p>
+                <p>{lead.lostReason || lead.lossReason}</p>
                 {lead.lossNotes && (
                   <p className="italic text-[11px] text-red-700">"{lead.lossNotes}"</p>
                 )}
+              </div>
+            )}
+            {lead.stage === 'fechado' && (
+              <div className="mt-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 space-y-1">
+                <p className="font-bold">Lead Ganho / Fechado com Sucesso</p>
+                {lead.saleValue ? (
+                  <p>
+                    Valor contratado: R${' '}
+                    {lead.saleValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                ) : null}
               </div>
             )}
           </div>

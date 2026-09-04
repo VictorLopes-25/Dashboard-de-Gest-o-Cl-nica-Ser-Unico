@@ -3,9 +3,6 @@ import {
   INITIAL_ROLES,
   INITIAL_COLLABORATORS,
   INITIAL_DENTISTS,
-  INITIAL_LEADS,
-  INITIAL_SCRIPTS,
-  INITIAL_CONTACT_HISTORY,
   getTodayDateString,
 } from '@/data/mockData'
 import type {
@@ -60,9 +57,27 @@ import {
   reopenAgendaItem as reopenAgendaItemService,
   cancelAgendaItem as cancelAgendaItemService,
   createManualAgendaItem,
+  syncLeadFollowUpAgendaItem,
   type DbAgendaItem,
   type TodayAgendaData,
 } from '@/services/agendaService'
+import {
+  fetchLeads as fetchLeadsService,
+  createLead as createLeadService,
+  updateLead as updateLeadService,
+  deleteLead as deleteLeadService,
+  fetchLeadContacts as fetchLeadContactsService,
+  createLeadContact as createLeadContactService,
+  type DbLead,
+  type DbLeadContact,
+} from '@/services/leadsService'
+import {
+  fetchScripts as fetchScriptsService,
+  createScript as createScriptService,
+  updateScript as updateScriptService,
+  deleteScript as deleteScriptService,
+  type DbScript,
+} from '@/services/scriptsService'
 
 export type { AuthUser }
 
@@ -244,84 +259,85 @@ function mapDbAgendaItemToUi(item: DbAgendaItem): AgendaItem {
   }
 }
 
-function mapDbLead(l: any): Lead {
+function mapDbLeadToUi(
+  l: DbLead,
+  peopleMap?: Map<string, string>,
+  rolesMap?: Map<string, string>,
+): Lead {
+  const assignedPersonName = l.commercial_person_id
+    ? peopleMap?.get(l.commercial_person_id) || null
+    : null
+  const assignedRoleName = l.commercial_function_id
+    ? rolesMap?.get(l.commercial_function_id) || null
+    : null
+
   return {
     id: l.id,
+    organizationId: l.organization_id,
     name: l.name,
     phone: l.phone || '',
-    origin: l.origin || 'Outro',
-    interest: l.interest || 'Outro',
-    stage: l.stage as LeadStage,
-    assignedToId: l.assigned_to_id || null,
-    assignedToName: l.assigned_to_name || null,
-    assignedToRole: l.assigned_to_role || null,
+    origin: l.origin,
+    referredByLeadId: l.referred_by_lead_id,
+    referredByName: l.referred_by_name,
+    campaign: l.campaign,
+    stage: l.stage,
+    lostReason: l.lost_reason,
     nextAction: l.next_action || '',
-    followUpDate: l.follow_up_date || getTodayDateString(0),
-    lossReason: l.loss_reason as LossReason | null,
-    lossNotes: l.loss_notes || null,
-    notes: l.notes || null,
+    nextContactAt: l.next_contact_at || '',
+    followUpDate: l.next_contact_at || '',
+    commercialFunctionId: l.commercial_function_id,
+    commercialPersonId: l.commercial_person_id,
+    evaluatorPersonId: l.evaluator_person_id,
+    evaluationScheduledAt: l.evaluation_scheduled_at,
+    evaluationCompletedAt: l.evaluation_completed_at,
+    saleValue: l.sale_value !== null ? Number(l.sale_value) : null,
+    saleDate: l.sale_date,
+    closedAt: l.closed_at,
+    lostAt: l.lost_at,
     createdAt: l.created_at,
-    updatedAt: l.updated_at,
+    // UI Helpers
+    assignedToId: l.commercial_person_id || l.evaluator_person_id || null,
+    assignedToName: assignedPersonName || (assignedRoleName ? assignedRoleName : 'CRC'),
+    assignedToRole: assignedRoleName || 'CRC',
+    interest: l.campaign || 'Implantes',
+    notes: null,
+    lossNotes: null,
   }
 }
 
-function leadToDb(l: Partial<Lead>): any {
-  const out: any = {}
-  if (l.name !== undefined) out.name = l.name
-  if (l.phone !== undefined) out.phone = l.phone
-  if (l.origin !== undefined) out.origin = l.origin
-  if (l.interest !== undefined) out.interest = l.interest
-  if (l.stage !== undefined) out.stage = l.stage
-  if (l.assignedToId !== undefined) out.assigned_to_id = l.assignedToId
-  if (l.assignedToName !== undefined) out.assigned_to_name = l.assignedToName
-  if (l.assignedToRole !== undefined) out.assigned_to_role = l.assignedToRole
-  if (l.nextAction !== undefined) out.next_action = l.nextAction
-  if (l.followUpDate !== undefined) out.follow_up_date = l.followUpDate
-  if (l.lossReason !== undefined) out.loss_reason = l.lossReason
-  if (l.lossNotes !== undefined) out.loss_notes = l.lossNotes
-  if (l.notes !== undefined) out.notes = l.notes
-  return out
-}
-
-function mapDbScript(s: any): Script {
+function mapDbScriptToUi(s: DbScript): Script {
   return {
     id: s.id,
+    organizationId: s.organization_id,
     title: s.title,
-    stage: s.stage as LeadStage,
+    stage: s.stage || 'novo',
     content: s.content || '',
-    updatedAt: s.updated_at || '',
+    active: s.active,
+    updatedAt: s.updated_at
+      ? new Date(s.updated_at).toLocaleDateString('pt-BR')
+      : new Date().toLocaleDateString('pt-BR'),
   }
 }
 
-function scriptToDb(s: Partial<Script>): any {
-  const out: any = {}
-  if (s.title !== undefined) out.title = s.title
-  if (s.stage !== undefined) out.stage = s.stage
-  if (s.content !== undefined) out.content = s.content
-  return out
-}
+function mapDbContactToUi(c: DbLeadContact, peopleMap?: Map<string, string>): ContactHistoryItem {
+  const registeredBy = c.person_id ? peopleMap?.get(c.person_id) || 'Equipe' : 'CRC Ser Único'
+  const dateFormatted = c.contact_date
+    ? `${c.contact_date.slice(0, 10)} ${new Date(c.contact_date).toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })}`
+    : ''
 
-function mapDbContactHistory(h: any): ContactHistoryItem {
   return {
-    id: h.id,
-    leadId: h.lead_id,
-    type: h.type || 'WhatsApp',
-    date: h.date || '',
-    summary: h.summary || '',
-    scriptTitleUsed: h.script_title_used || undefined,
-    registeredBy: h.registered_by || 'CRC Ser Único',
+    id: c.id,
+    organizationId: c.organization_id,
+    leadId: c.lead_id,
+    type: c.channel || 'WhatsApp',
+    date: dateFormatted,
+    summary: c.notes || '',
+    registeredBy,
+    personId: c.person_id,
   }
-}
-
-function contactHistoryToDb(h: Partial<ContactHistoryItem>): any {
-  const out: any = {}
-  if (h.leadId !== undefined) out.lead_id = h.leadId
-  if (h.type !== undefined) out.type = h.type
-  if (h.date !== undefined) out.date = h.date
-  if (h.summary !== undefined) out.summary = h.summary
-  if (h.scriptTitleUsed !== undefined) out.script_title_used = h.scriptTitleUsed
-  if (h.registeredBy !== undefined) out.registered_by = h.registeredBy
-  return out
 }
 
 // ------------------------------------------------------------------
@@ -378,7 +394,7 @@ interface AppContextType {
   reopenAgendaItem: (id: string) => Promise<void>
   cancelAgendaItem: (id: string) => Promise<void>
   addManualAgendaItem: (payload: {
-    type: 'tarefa' | 'compromisso' | 'pendencia'
+    type: 'tarefa' | 'compromisso' | 'follow_up' | 'pendencia'
     title: string
     dueDate: string
     dueTime?: string | null
@@ -446,10 +462,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [tasks, setTasks] = useState<Task[]>([])
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([])
   const [overdueAgendaItems, setOverdueAgendaItems] = useState<AgendaItem[]>([])
-  const [leads, setLeads] = useState<Lead[]>(INITIAL_LEADS)
-  const [scripts, setScripts] = useState<Script[]>(INITIAL_SCRIPTS)
-  const [contactHistory, setContactHistory] =
-    useState<ContactHistoryItem[]>(INITIAL_CONTACT_HISTORY)
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [scripts, setScripts] = useState<Script[]>([])
+  const [contactHistory, setContactHistory] = useState<ContactHistoryItem[]>([])
 
   const setCurrentUser = useCallback((user: AuthUser | null) => {
     setCurrentUserState(user)
@@ -552,9 +567,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       setAgendaItems(allTodayUi)
       setOverdueAgendaItems(overdueUi)
+
+      // 6. Carregar Leads (public.leads)
+      const dbLeads = await fetchLeadsService()
+      const peopleNamesMap = new Map(dbPeople.map((p) => [p.id, p.name]))
+      const roleNamesMap = new Map(dbFuncs.map((f) => [f.id, f.name]))
+      const mappedLeads = dbLeads.map((l) => mapDbLeadToUi(l, peopleNamesMap, roleNamesMap))
+      setLeads(mappedLeads)
+
+      // 7. Carregar Scripts (public.scripts)
+      const dbScripts = await fetchScriptsService(false)
+      const mappedScripts = dbScripts.map(mapDbScriptToUi)
+      setScripts(mappedScripts)
+
+      // 8. Carregar Histórico de Contatos (public.lead_contacts)
+      const dbContacts = await fetchLeadContactsService()
+      const mappedContacts = dbContacts.map((c) => mapDbContactToUi(c, peopleNamesMap))
+      setContactHistory(mappedContacts)
     } catch (err) {
-      console.error('Erro crítico ao carregar dados estruturais do Supabase:', err)
-      // Conforme Regra 7: NÃO fazer fallback silencioso para mocks. Erros claramente sinalizados.
+      console.error('Erro crítico ao carregar dados do Supabase:', err)
+      // Conforme Regra de ouro: NÃO fazer fallback silencioso para mocks. Erros claramente sinalizados.
       throw err
     } finally {
       setLoading(false)
@@ -845,6 +877,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       setAgendaItems((prev) => prev.map((i) => (i.id === id ? uiItem : i)))
       setOverdueAgendaItems((prev) => prev.filter((i) => i.id !== id))
+
+      // Regra 5: Completar follow-up pela agenda registra contato se for lead
+      if (uiItem.type === 'follow_up' && uiItem.sourceType === 'lead' && uiItem.sourceId) {
+        try {
+          const leadId = uiItem.sourceId
+          const noteText = uiItem.notes || uiItem.title
+          await createLeadContactService({
+            lead_id: leadId,
+            channel: 'Agenda',
+            notes: `Follow-up concluído via agenda: ${noteText}`,
+            person_id: uiItem.personId || null,
+          })
+
+          // Atualiza lista de contatos em memória
+          const dbContacts = await fetchLeadContactsService(leadId)
+          const peopleMap = new Map(collaborators.map((c) => [c.id, c.name]))
+          const mapped = dbContacts.map((c) => mapDbContactToUi(c, peopleMap))
+          setContactHistory((prev) => {
+            const others = prev.filter((h) => h.leadId !== leadId)
+            return [...mapped, ...others]
+          })
+        } catch (contactErr) {
+          console.warn('Follow-up concluído, mas falha ao auto-registrar contato:', contactErr)
+        }
+      }
     } catch (err) {
       console.error('Falha ao concluir item na agenda:', err)
       throw err
@@ -884,7 +941,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }
 
   const addManualAgendaItem = async (payload: {
-    type: 'tarefa' | 'compromisso' | 'pendencia'
+    type: 'tarefa' | 'compromisso' | 'follow_up' | 'pendencia'
     title: string
     dueDate: string
     dueTime?: string | null
@@ -959,41 +1016,212 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }
 
   // ----------------------------------------------------------------
-  // CRUD — Leads
+  // CRUD — Leads (public.leads no Supabase + Follow-up na agenda)
   // ----------------------------------------------------------------
 
   const addLead = async (
     leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>,
   ): Promise<Lead | null> => {
-    const now = new Date().toISOString()
-    const localLead: Lead = {
-      ...leadData,
-      id: `lead-local-${Date.now()}`,
-      createdAt: now,
-      updatedAt: now,
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const nextContactAt = leadData.nextContactAt || leadData.followUpDate || today
+      const stage = leadData.stage || 'novo'
+
+      // Resolver comercial / função responsável padrão (ex.: CRC Comercial)
+      let commFuncId = leadData.commercialFunctionId || null
+      let commPersonId = leadData.commercialPersonId || leadData.assignedToId || null
+
+      if (!commFuncId && !commPersonId) {
+        const crcFunc = roles.find(
+          (r) => r.name.toLowerCase().includes('crc') || r.name.toLowerCase().includes('comercial'),
+        )
+        if (crcFunc) commFuncId = crcFunc.id
+      }
+
+      const created = await createLeadService({
+        name: leadData.name,
+        phone: leadData.phone || null,
+        origin: leadData.origin,
+        referred_by_lead_id: leadData.referredByLeadId || null,
+        referred_by_name: leadData.referredByName || null,
+        campaign: leadData.campaign || leadData.interest || null,
+        stage,
+        next_action: leadData.nextAction || 'Aguardando primeiro contato com o paciente',
+        next_contact_at: nextContactAt,
+        commercial_function_id: commFuncId,
+        commercial_person_id: commPersonId,
+        evaluator_person_id: leadData.evaluatorPersonId || null,
+        sale_value: leadData.saleValue ?? null,
+        sale_date: leadData.saleDate || null,
+        closed_at: leadData.closedAt || (stage === 'fechado' ? new Date().toISOString() : null),
+        lost_at: leadData.lostAt || (stage === 'perdido' ? new Date().toISOString() : null),
+        lost_reason: leadData.lostReason || null,
+      })
+
+      // Regra 5: Criar follow-up na agenda unificada se stage ativo
+      if (stage !== 'fechado' && stage !== 'perdido' && nextContactAt) {
+        try {
+          const agendaItemCreated = await syncLeadFollowUpAgendaItem({
+            leadId: created.id,
+            leadName: created.name,
+            nextContactAt,
+            nextAction: created.next_action,
+            commercialFunctionId: created.commercial_function_id,
+            commercialPersonId: created.commercial_person_id,
+          })
+          if (agendaItemCreated.due_date === today) {
+            setAgendaItems((prev) => [mapDbAgendaItemToUi(agendaItemCreated), ...prev])
+          }
+        } catch (agendaErr) {
+          console.warn('Falha ao sincronizar follow-up na agenda:', agendaErr)
+        }
+      }
+
+      const peopleMap = new Map(collaborators.map((c) => [c.id, c.name]))
+      const rolesMap = new Map(roles.map((r) => [r.id, r.name]))
+      const uiLead = mapDbLeadToUi(created, peopleMap, rolesMap)
+
+      setLeads((prev) => [uiLead, ...prev])
+      return uiLead
+    } catch (err) {
+      console.error('Falha ao cadastrar lead no Supabase:', err)
+      throw err
     }
-    setLeads((prev) => [localLead, ...prev])
-    return localLead
   }
 
   const updateLead = async (id: string, updates: Partial<Lead>) => {
-    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updates } : l)))
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const dbUpdates: any = {}
+
+      if (updates.name !== undefined) dbUpdates.name = updates.name
+      if (updates.phone !== undefined) dbUpdates.phone = updates.phone
+      if (updates.origin !== undefined) dbUpdates.origin = updates.origin
+      if (updates.referredByLeadId !== undefined)
+        dbUpdates.referred_by_lead_id = updates.referredByLeadId
+      if (updates.referredByName !== undefined) dbUpdates.referred_by_name = updates.referredByName
+      if (updates.campaign !== undefined) dbUpdates.campaign = updates.campaign
+      if (updates.stage !== undefined) dbUpdates.stage = updates.stage
+      if (updates.lostReason !== undefined) dbUpdates.lost_reason = updates.lostReason
+      if (updates.nextAction !== undefined) dbUpdates.next_action = updates.nextAction
+
+      const nextContact = updates.nextContactAt ?? updates.followUpDate
+      if (nextContact !== undefined) {
+        dbUpdates.next_contact_at = nextContact
+      }
+
+      if (updates.commercialFunctionId !== undefined)
+        dbUpdates.commercial_function_id = updates.commercialFunctionId
+      if (updates.commercialPersonId !== undefined)
+        dbUpdates.commercial_person_id = updates.commercialPersonId
+      if (updates.assignedToId !== undefined) dbUpdates.commercial_person_id = updates.assignedToId
+      if (updates.evaluatorPersonId !== undefined)
+        dbUpdates.evaluator_person_id = updates.evaluatorPersonId
+      if (updates.saleValue !== undefined) dbUpdates.sale_value = updates.saleValue
+      if (updates.saleDate !== undefined) dbUpdates.sale_date = updates.saleDate
+      if (updates.closedAt !== undefined) dbUpdates.closed_at = updates.closedAt
+      if (updates.lostAt !== undefined) dbUpdates.lost_at = updates.lostAt
+
+      const updated = await updateLeadService(id, dbUpdates)
+
+      // Regra 5: Sincronizar agenda de follow-up se ativo
+      if (updated.stage !== 'fechado' && updated.stage !== 'perdido' && updated.next_contact_at) {
+        try {
+          const agendaItemSynced = await syncLeadFollowUpAgendaItem({
+            leadId: updated.id,
+            leadName: updated.name,
+            nextContactAt: updated.next_contact_at,
+            nextAction: updated.next_action,
+            commercialFunctionId: updated.commercial_function_id,
+            commercialPersonId: updated.commercial_person_id,
+          })
+          const mapped = mapDbAgendaItemToUi(agendaItemSynced)
+          setAgendaItems((prev) => {
+            const exists = prev.some((i) => i.id === mapped.id)
+            if (exists) {
+              return prev.map((i) => (i.id === mapped.id ? mapped : i))
+            }
+            if (mapped.dueDate === today) {
+              return [mapped, ...prev]
+            }
+            return prev
+          })
+        } catch (agendaErr) {
+          console.warn('Falha ao sincronizar agenda de follow-up:', agendaErr)
+        }
+      } else if (updated.stage === 'fechado' || updated.stage === 'perdido') {
+        // Se foi fechado ou perdido, cancelar follow-ups abertos desse lead na agenda
+        try {
+          const matchingItems = agendaItems.filter(
+            (i) => i.sourceType === 'lead' && i.sourceId === updated.id && i.status === 'aberto',
+          )
+          for (const m of matchingItems) {
+            await cancelAgendaItemService(m.id)
+          }
+          setAgendaItems((prev) =>
+            prev.map((i) =>
+              i.sourceType === 'lead' && i.sourceId === updated.id && i.status === 'aberto'
+                ? { ...i, status: 'cancelado' }
+                : i,
+            ),
+          )
+        } catch (e) {
+          console.warn('Erro ao cancelar agenda de lead fechado/perdido:', e)
+        }
+      }
+
+      const peopleMap = new Map(collaborators.map((c) => [c.id, c.name]))
+      const rolesMap = new Map(roles.map((r) => [r.id, r.name]))
+      const uiLead = mapDbLeadToUi(updated, peopleMap, rolesMap)
+
+      setLeads((prev) => prev.map((l) => (l.id === id ? uiLead : l)))
+    } catch (err) {
+      console.error(`Falha ao atualizar lead ${id}:`, err)
+      throw err
+    }
   }
 
   const deleteLead = async (id: string) => {
-    setLeads((prev) => prev.filter((l) => l.id !== id))
+    try {
+      await deleteLeadService(id)
+      setLeads((prev) => prev.filter((l) => l.id !== id))
+      setAgendaItems((prev) => prev.filter((i) => !(i.sourceType === 'lead' && i.sourceId === id)))
+    } catch (err) {
+      console.error(`Falha ao excluir lead ${id}:`, err)
+      throw err
+    }
   }
 
   const moveLeadStage = async (
     leadId: string,
     targetStage: LeadStage,
-    extra?: { lossReason?: LossReason; lossNotes?: string },
+    extra?: { lossReason?: string; lossNotes?: string; nextContactAt?: string },
   ) => {
+    const today = new Date().toISOString().split('T')[0]
+    const nowIso = new Date().toISOString()
+
+    const currentLead = leads.find((l) => l.id === leadId)
+    const existingNext = currentLead?.nextContactAt || currentLead?.followUpDate
+
     const updates: Partial<Lead> = {
       stage: targetStage,
-      lossReason: extra?.lossReason ?? null,
-      lossNotes: extra?.lossNotes ?? null,
     }
+
+    if (targetStage === 'fechado') {
+      updates.closedAt = nowIso
+      updates.lostAt = null
+    } else if (targetStage === 'perdido') {
+      updates.lostAt = nowIso
+      updates.closedAt = null
+      updates.lostReason = extra?.lossReason || 'Perda sem motivo informado'
+    } else {
+      // Estágio ativo: exige next_contact_at
+      updates.closedAt = null
+      updates.lostAt = null
+      updates.nextContactAt = extra?.nextContactAt || existingNext || today
+      updates.followUpDate = updates.nextContactAt
+    }
+
     await updateLead(leadId, updates)
   }
 
@@ -1004,38 +1232,70 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addScript = async (
     scriptData: Omit<Script, 'id' | 'updatedAt'>,
   ): Promise<Script | null> => {
-    const localScript: Script = {
-      ...scriptData,
-      id: `script-local-${Date.now()}`,
-      updatedAt: new Date().toLocaleDateString('pt-BR'),
+    try {
+      const created = await createScriptService({
+        title: scriptData.title,
+        content: scriptData.content,
+        stage: scriptData.stage || null,
+        active: scriptData.active ?? true,
+      })
+      const uiScript = mapDbScriptToUi(created)
+      setScripts((prev) => [uiScript, ...prev])
+      return uiScript
+    } catch (err) {
+      console.error('Falha ao adicionar script no Supabase:', err)
+      throw err
     }
-    setScripts((prev) => [localScript, ...prev])
-    return localScript
   }
 
   const updateScript = async (id: string, updates: Partial<Script>) => {
-    setScripts((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)))
+    try {
+      const updated = await updateScriptService(id, {
+        title: updates.title,
+        content: updates.content,
+        stage: updates.stage || null,
+        active: updates.active,
+      })
+      const uiScript = mapDbScriptToUi(updated)
+      setScripts((prev) => prev.map((s) => (s.id === id ? uiScript : s)))
+    } catch (err) {
+      console.error(`Falha ao atualizar script ${id}:`, err)
+      throw err
+    }
   }
 
   const deleteScript = async (id: string) => {
-    setScripts((prev) => prev.filter((s) => s.id !== id))
+    try {
+      await deleteScriptService(id)
+      setScripts((prev) => prev.filter((s) => s.id !== id))
+    } catch (err) {
+      console.error(`Falha ao excluir script ${id}:`, err)
+      throw err
+    }
   }
 
   const addContactHistory = async (item: Omit<ContactHistoryItem, 'id'>) => {
-    const localItem: ContactHistoryItem = {
-      ...item,
-      id: `hist-local-${Date.now()}`,
+    try {
+      const created = await createLeadContactService({
+        lead_id: item.leadId,
+        channel: item.type,
+        notes: item.summary,
+        person_id: item.personId || null,
+        contact_date: item.date || new Date().toISOString(),
+      })
+      const peopleMap = new Map(collaborators.map((c) => [c.id, c.name]))
+      const uiContact = mapDbContactToUi(created, peopleMap)
+      setContactHistory((prev) => [uiContact, ...prev])
+    } catch (err) {
+      console.error('Falha ao registrar contato com lead no Supabase:', err)
+      throw err
     }
-    setContactHistory((prev) => [localItem, ...prev])
   }
 
-  // Reset dados locais para dados de demonstração (módulos não conectados recarregam; conectados recarregam do Supabase)
+  // Reset dados: recarrega tudo do Supabase
   const resetData = async () => {
     await refreshData()
     setDentists(INITIAL_DENTISTS)
-    setLeads(INITIAL_LEADS)
-    setScripts(INITIAL_SCRIPTS)
-    setContactHistory(INITIAL_CONTACT_HISTORY)
   }
 
   return (

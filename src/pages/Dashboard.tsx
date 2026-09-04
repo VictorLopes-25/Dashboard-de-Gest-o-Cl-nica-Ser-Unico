@@ -25,6 +25,7 @@ export default function Dashboard() {
     collaborators,
     agendaItems,
     overdueAgendaItems,
+    leads,
     loadAgendaWindow,
     toggleTaskCompletion,
   } = useApp()
@@ -111,6 +112,13 @@ export default function Dashboard() {
     return overdueAgendaItems.filter((i) => i.status === 'aberto' && i.dueDate < todayStr)
   }, [overdueAgendaItems, todayStr])
 
+  // 4. "Follow-ups de hoje" (Regra Stage 2C): type='follow_up', due_date=CURRENT_DATE, status='aberto'
+  const todayFollowUps = useMemo(() => {
+    return agendaItems.filter(
+      (i) => i.type === 'follow_up' && i.dueDate === todayStr && i.status === 'aberto',
+    )
+  }, [agendaItems, todayStr])
+
   // Minhas tarefas de hoje: agenda da função do usuário ativo atual (abertas e concluídas)
   const myTasks = useMemo(() => {
     return agendaItems.filter((i) => {
@@ -169,8 +177,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Top KPI Statistics Cards (Sem mock de Follow-ups do CRM, apenas dados reais de agenda_items) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Top KPI Statistics Cards (Restaurado KPI Follow-ups de hoje com dados reais de agenda_items) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Tarefas de hoje */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-teal-300 transition">
           <div
@@ -215,6 +223,24 @@ export default function Dashboard() {
               {overdueTasks.length}
             </div>
             <p className="text-xs font-medium text-slate-500">Atrasadas</p>
+          </div>
+        </div>
+
+        {/* Card 4: Follow-ups de hoje (Regra Stage 2C: honestidade de dados, contagem real) */}
+        <div
+          onClick={() => navigate('/agenda')}
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-amber-400 transition cursor-pointer group"
+        >
+          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-2xl font-bold text-slate-900 tracking-tight">
+              {todayFollowUps.length > 0 ? todayFollowUps.length : '0'}
+            </div>
+            <p className="text-xs font-medium text-slate-500 truncate" title="Follow-ups de hoje">
+              Follow-ups de hoje
+            </p>
           </div>
         </div>
       </div>
@@ -455,6 +481,74 @@ export default function Dashboard() {
                 </div>
               )
             })}
+          </div>
+        </div>
+      </div>
+
+      {/* Painel: Métricas Comerciais Básicas Reais (Stage 2C: leads reais, sem mocks) */}
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-teal-700" />
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Métricas Comerciais do CRM</h2>
+              <p className="text-xs text-slate-500">
+                Funil e conversão calculados diretamente dos leads cadastrados no Supabase
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/crm')}
+            className="text-xs font-semibold text-teal-700 hover:text-teal-800"
+          >
+            Ver funil completo
+            <ArrowRight className="w-3.5 h-3.5 ml-1" />
+          </Button>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
+            <p className="text-xs font-semibold text-slate-500">Total de Leads</p>
+            <p className="text-2xl font-bold text-slate-900 mt-1">{leads.length}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">Na base ativa</p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-100">
+            <p className="text-xs font-semibold text-amber-800">Em Atendimento</p>
+            <p className="text-2xl font-bold text-amber-950 mt-1">
+              {leads.filter((l) => l.stage !== 'fechado' && l.stage !== 'perdido').length}
+            </p>
+            <p className="text-[11px] text-amber-700/80 mt-0.5">Estágios ativos</p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-100">
+            <p className="text-xs font-semibold text-emerald-800">Leads Fechados</p>
+            <p className="text-2xl font-bold text-emerald-950 mt-1">
+              {leads.filter((l) => l.stage === 'fechado').length}
+            </p>
+            <p className="text-[11px] text-emerald-700/80 mt-0.5">
+              {leads.length > 0
+                ? `${Math.round((leads.filter((l) => l.stage === 'fechado').length / leads.length) * 100)}% conversão`
+                : '— conversão'}
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-teal-50/60 border border-teal-100">
+            <p className="text-xs font-semibold text-teal-800">Valor em Vendas</p>
+            <p className="text-2xl font-bold text-teal-950 mt-1">
+              {leads.filter((l) => l.stage === 'fechado' && l.saleValue).length > 0
+                ? `R$ ${leads
+                    .filter((l) => l.stage === 'fechado' && l.saleValue)
+                    .reduce((acc, curr) => acc + (curr.saleValue || 0), 0)
+                    .toLocaleString('pt-BR', {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0,
+                    })}`
+                : 'R$ 0'}
+            </p>
+            <p className="text-[11px] text-teal-700/80 mt-0.5">Total contratado</p>
           </div>
         </div>
       </div>

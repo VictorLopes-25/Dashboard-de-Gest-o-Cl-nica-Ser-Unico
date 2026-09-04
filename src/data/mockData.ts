@@ -340,9 +340,10 @@ export const INITIAL_LEADS: Lead[] = [
     id: 'lead-1',
     name: 'Maria Helena Silveira',
     phone: '(11) 99876-5432',
-    origin: 'Instagram',
+    origin: 'meta_ads',
     interest: 'Implantes',
-    stage: 'Novo',
+    stage: 'novo',
+    nextContactAt: getTodayDateString(0),
     assignedToId: 'colab-paula',
     assignedToName: 'Paula Rocha',
     assignedToRole: 'CRC',
@@ -350,15 +351,15 @@ export const INITIAL_LEADS: Lead[] = [
     followUpDate: getTodayDateString(0),
     notes: 'Interessada em implante protocolo superior. Viu anúncio sobre dentes fixos.',
     createdAt: getTodayDateString(-1),
-    updatedAt: getTodayDateString(0),
   },
   {
     id: 'lead-2',
     name: 'Carlos Eduardo Nogueira',
     phone: '(11) 98123-4567',
-    origin: 'Google',
+    origin: 'google',
     interest: 'Lentes de contato',
-    stage: 'Em Contato',
+    stage: 'avaliacao_agendada',
+    nextContactAt: getTodayDateString(0),
     assignedToId: 'colab-paula',
     assignedToName: 'Paula Rocha',
     assignedToRole: 'CRC',
@@ -366,15 +367,16 @@ export const INITIAL_LEADS: Lead[] = [
     followUpDate: getTodayDateString(0),
     notes: 'Busca alinhamento estético e fechamento de diastema com facetas de porcelana.',
     createdAt: getTodayDateString(-3),
-    updatedAt: getTodayDateString(-1),
   },
   {
     id: 'lead-3',
     name: 'Fernanda Bastos',
     phone: '(11) 97234-5678',
-    origin: 'Indicação',
+    origin: 'indicacao',
+    referredByName: 'Marcela Paciente',
     interest: 'Aparelho',
-    stage: 'Avaliação',
+    stage: 'avaliacao_realizada',
+    nextContactAt: getTodayDateString(1),
     assignedToId: 'dentist-dra-juliana',
     assignedToName: 'Dra. Juliana Vasconcelos',
     assignedToRole: 'Dentistas',
@@ -382,15 +384,15 @@ export const INITIAL_LEADS: Lead[] = [
     followUpDate: getTodayDateString(1),
     notes: 'Indicada pela paciente Marcela. Deseja saber mais sobre alinhadores invisíveis.',
     createdAt: getTodayDateString(-5),
-    updatedAt: getTodayDateString(-2),
   },
   {
     id: 'lead-4',
     name: 'Roberto Guimarães',
     phone: '(11) 99345-6789',
-    origin: 'WhatsApp',
+    origin: 'organico',
     interest: 'Implantes',
-    stage: 'Proposta',
+    stage: 'proposta_enviada',
+    nextContactAt: getTodayDateString(0),
     assignedToId: 'colab-paula',
     assignedToName: 'Paula Rocha',
     assignedToRole: 'CRC',
@@ -398,15 +400,17 @@ export const INITIAL_LEADS: Lead[] = [
     followUpDate: getTodayDateString(0),
     notes: 'Proposta de R$ 14.800 apresentada. Avaliando condições de parcelamento.',
     createdAt: getTodayDateString(-7),
-    updatedAt: getTodayDateString(-1),
   },
   {
     id: 'lead-5',
     name: 'Juliana Paes Correia',
     phone: '(11) 98456-7890',
-    origin: 'Site',
+    origin: 'meta_ads',
     interest: 'Clareamento',
-    stage: 'Fechado',
+    stage: 'fechado',
+    closedAt: getTodayDateString(-1),
+    saleValue: 2400,
+    nextContactAt: '',
     assignedToId: 'colab-paula',
     assignedToName: 'Paula Rocha',
     assignedToRole: 'CRC',
@@ -414,15 +418,17 @@ export const INITIAL_LEADS: Lead[] = [
     followUpDate: getTodayDateString(2),
     notes: 'Tratamento fechado com sucesso. Protocolo combinado: laser + caseiro.',
     createdAt: getTodayDateString(-10),
-    updatedAt: getTodayDateString(-1),
   },
   {
     id: 'lead-6',
     name: 'Ricardo Vasconcelos',
     phone: '(11) 97567-8901',
-    origin: 'Facebook',
+    origin: 'meta_ads',
     interest: 'Prótese',
-    stage: 'Perdido',
+    stage: 'perdido',
+    lostAt: getTodayDateString(-5),
+    lostReason: 'Preço',
+    nextContactAt: '',
     assignedToId: 'colab-paula',
     assignedToName: 'Paula Rocha',
     assignedToRole: 'CRC',
@@ -432,15 +438,15 @@ export const INITIAL_LEADS: Lead[] = [
     followUpDate: getTodayDateString(90),
     notes: 'Achou o valor acima da expectativa inicial.',
     createdAt: getTodayDateString(-14),
-    updatedAt: getTodayDateString(-5),
   },
   {
     id: 'lead-7',
     name: 'Camila Mendonça',
     phone: '(11) 99678-9012',
-    origin: 'Instagram',
+    origin: 'meta_ads',
     interest: 'Aparelho',
-    stage: 'Novo',
+    stage: 'novo',
+    nextContactAt: getTodayDateString(-1),
     assignedToId: 'colab-paula',
     assignedToName: 'Paula Rocha',
     assignedToRole: 'CRC',
@@ -448,15 +454,15 @@ export const INITIAL_LEADS: Lead[] = [
     followUpDate: getTodayDateString(-1), // Atrasado para demonstrar alerta vermelho
     notes: 'Preencheu formulário de interesse em Invisalign.',
     createdAt: getTodayDateString(-2),
-    updatedAt: getTodayDateString(-2),
   },
   {
     id: 'lead-8',
     name: 'Thiago Martins',
     phone: '(11) 98789-0123',
-    origin: 'Google',
+    origin: 'google',
     interest: 'Implantes',
-    stage: 'Em Contato',
+    stage: 'avaliacao_agendada',
+    nextContactAt: getTodayDateString(1),
     assignedToId: 'colab-paula',
     assignedToName: 'Paula Rocha',
     assignedToRole: 'CRC',
@@ -464,7 +470,6 @@ export const INITIAL_LEADS: Lead[] = [
     followUpDate: getTodayDateString(1),
     notes: 'Gostou das explicações sobre sedação consciente.',
     createdAt: getTodayDateString(-3),
-    updatedAt: getTodayDateString(-1),
   },
 ]
 
@@ -472,7 +477,7 @@ export const INITIAL_SCRIPTS: Script[] = [
   {
     id: 'script-1',
     title: '1º Contato WhatsApp — Novo Lead (Boas-vindas e Acolhimento)',
-    stage: 'Novo',
+    stage: 'novo',
     content: `Olá, [Nome do Paciente]! Tudo bem com você? 😊
 
 Aqui é a Paula da Clínica Ser Único! Vi que você demonstrou interesse em transformar seu sorriso com [Interesse/Tratamento].
@@ -485,7 +490,7 @@ Como você prefere que a gente converse: por aqui ou posso te ligar rapidinho pa
   {
     id: 'script-2',
     title: 'Qualificação e Agendamento de Avaliação',
-    stage: 'Em Contato',
+    stage: 'avaliacao_agendada',
     content: `Que ótimo, [Nome do Paciente]!
 
 Nossa consulta de avaliação é completa: fazemos o escaneamento digital do seu sorriso, fotos em alta resolução e o Dr. Especialista desenha na hora uma prévia do seu resultado.
@@ -500,7 +505,7 @@ Qual desses se encaixa melhor na sua rotina?`,
   {
     id: 'script-3',
     title: 'Confirmação e Preparação para Consulta de Avaliação',
-    stage: 'Avaliação',
+    stage: 'avaliacao_agendada',
     content: `Olá, [Nome do Paciente]!
 
 Confirmando sua consulta de avaliação com a nossa equipe amanhã às [Horário] aqui na Ser Único.
@@ -514,7 +519,7 @@ Podemos confirmar sua presença?`,
   {
     id: 'script-4',
     title: 'Follow-up de Proposta Clínica e Condições de Pagamento',
-    stage: 'Proposta',
+    stage: 'proposta_enviada',
     content: `Olá, [Nome do Paciente]! Como você está?
 
 Passando para saber se você conseguiu analisar o planejamento do seu tratamento que o doutor apresentou!
@@ -527,7 +532,7 @@ Podemos marcar 5 minutinhos para eu te apresentar essa facilidade?`,
   {
     id: 'script-5',
     title: 'Boas-vindas ao Paciente Fechado e Próximos Passos',
-    stage: 'Fechado',
+    stage: 'fechado',
     content: `Parabéns pela decisão, [Nome do Paciente]! 🎉
 
 Estamos muito felizes em fazer parte dessa transformação do seu sorriso na Ser Único.

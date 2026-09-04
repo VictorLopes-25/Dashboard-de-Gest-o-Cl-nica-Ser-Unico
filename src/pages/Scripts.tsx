@@ -55,7 +55,7 @@ export default function Scripts() {
 
   // Form states
   const [title, setTitle] = useState('')
-  const [stage, setStage] = useState<LeadStage>('Novo')
+  const [stage, setStage] = useState<LeadStage>('novo')
   const [content, setContent] = useState('')
 
   const [errorTitle, setErrorTitle] = useState('')
@@ -64,7 +64,7 @@ export default function Scripts() {
   const handleOpenCreate = () => {
     setEditingScript(null)
     setTitle('')
-    setStage('Novo')
+    setStage('novo')
     setContent('')
     setErrorTitle('')
     setErrorContent('')
@@ -74,7 +74,7 @@ export default function Scripts() {
   const handleOpenEdit = (script: Script) => {
     setEditingScript(script)
     setTitle(script.title)
-    setStage(script.stage)
+    setStage((script.stage as LeadStage) || 'novo')
     setContent(script.content)
     setErrorTitle('')
     setErrorContent('')

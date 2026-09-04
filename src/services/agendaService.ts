@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase/client'
 import { getOrganizationId } from './organizationService'
 import { DbTask, DbRecurrenceType } from './tasksService'
 
-export type AgendaItemType = 'tarefa' | 'compromisso' | 'pendencia'
+export type AgendaItemType = 'tarefa' | 'compromisso' | 'follow_up' | 'pendencia'
 export type AgendaItemStatus = 'aberto' | 'concluido' | 'cancelado'
 
 export interface DbAgendaItem {
@@ -25,13 +25,96 @@ export interface DbAgendaItem {
 }
 
 export interface CreateManualAgendaItemPayload {
-  type: AgendaItemType // 'tarefa' | 'compromisso' | 'pendencia'
+  type: AgendaItemType // 'tarefa' | 'compromisso' | 'follow_up' | 'pendencia'
   title: string
   due_date: string
   due_time?: string | null
   function_id?: string | null
   person_id?: string | null
+  source_type?: string | null
+  source_id?: string | null
   notes?: string | null
+}
+
+/**
+ * Cria ou sincroniza um item de follow-up na agenda unificada para um Lead.
+ * - type = 'follow_up'
+ * - source_type = 'lead'
+ * - source_id = lead.id
+ * - due_date = next_contact_at
+ * - title = "Follow-up: {lead.name} — {next_action}"
+ * - function_id / person_id = snapshot da responsabilidade comercial
+ */
+export async function syncLeadFollowUpAgendaItem(params: {
+  leadId: string
+  leadName: string
+  nextContactAt: string // YYYY-MM-DD
+  nextAction?: string | null
+  commercialFunctionId?: string | null
+  commercialPersonId?: string | null
+}): Promise<DbAgendaItem> {
+  const orgId = await getOrganizationId()
+
+  const title = `Follow-up: ${params.leadName}${params.nextAction ? ` — ${params.nextAction}` : ''}`
+
+  // Verificar se já existe um item de follow-up aberto para este lead
+  const { data: existing } = await supabase
+    .from('agenda_items')
+    .select('id, status')
+    .eq('organization_id', orgId)
+    .eq('source_type', 'lead')
+    .eq('source_id', params.leadId)
+    .eq('type', 'follow_up')
+    .eq('status', 'aberto')
+    .maybeSingle()
+
+  if (existing?.id) {
+    // Atualiza o item aberto existente com nova data, ação e responsável
+    const { data: updated, error } = await supabase
+      .from('agenda_items')
+      .update({
+        title,
+        due_date: params.nextContactAt,
+        function_id: params.commercialFunctionId ?? null,
+        person_id: params.commercialPersonId ?? null,
+        notes: params.nextAction ?? null,
+      })
+      .eq('id', existing.id)
+      .eq('organization_id', orgId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Erro ao atualizar follow-up na agenda:', error)
+      throw new Error(`Falha ao sincronizar follow-up na agenda: ${error.message}`)
+    }
+    return updated as DbAgendaItem
+  }
+
+  // Cria novo item de follow_up na agenda
+  const { data: created, error } = await supabase
+    .from('agenda_items')
+    .insert({
+      organization_id: orgId,
+      type: 'follow_up',
+      title,
+      due_date: params.nextContactAt,
+      status: 'aberto',
+      function_id: params.commercialFunctionId ?? null,
+      person_id: params.commercialPersonId ?? null,
+      source_type: 'lead',
+      source_id: params.leadId,
+      notes: params.nextAction ?? null,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Erro ao criar follow-up na agenda:', error)
+    throw new Error(`Falha ao criar follow-up na agenda: ${error.message}`)
+  }
+
+  return created as DbAgendaItem
 }
 
 export interface AgendaDateRangeFilter {
@@ -480,8 +563,13 @@ export async function createManualAgendaItem(
 ): Promise<DbAgendaItem> {
   const orgId = await getOrganizationId()
 
-  if (payload.type !== 'tarefa' && payload.type !== 'compromisso' && payload.type !== 'pendencia') {
-    throw new Error(`Tipo de item '${payload.type}' não permitido no escopo da Stage 2B.`)
+  if (
+    payload.type !== 'tarefa' &&
+    payload.type !== 'compromisso' &&
+    payload.type !== 'follow_up' &&
+    payload.type !== 'pendencia'
+  ) {
+    throw new Error(`Tipo de item '${payload.type}' não permitido.`)
   }
 
   const { data, error } = await supabase
@@ -495,8 +583,8 @@ export async function createManualAgendaItem(
       status: 'aberto',
       function_id: payload.function_id ?? null,
       person_id: payload.person_id ?? null,
-      source_type: null,
-      source_id: null,
+      source_type: payload.source_type ?? null,
+      source_id: payload.source_id ?? null,
       notes: payload.notes ?? null,
     })
     .select()

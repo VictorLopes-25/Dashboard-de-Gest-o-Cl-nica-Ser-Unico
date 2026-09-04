@@ -43,7 +43,7 @@ export interface Task {
 export interface AgendaItem {
   id: string
   organizationId: string
-  type: 'tarefa' | 'compromisso' | 'pendencia'
+  type: 'tarefa' | 'compromisso' | 'follow_up' | 'pendencia'
   title: string
   dueDate: string // YYYY-MM-DD
   dueTime?: string | null
@@ -61,28 +61,45 @@ export interface AgendaItem {
 
 export interface Lead {
   id: string
+  organizationId?: string
   name: string
   phone: string
-  origin: string
-  interest: string
+  origin: LeadOrigin
+  referredByLeadId?: string | null
+  referredByName?: string | null
+  campaign?: string | null
   stage: LeadStage
+  lostReason?: string | null
+  lossReason?: string | null
+  nextAction: string
+  nextContactAt: string // YYYY-MM-DD (exigido para stages ativos)
+  commercialFunctionId?: string | null
+  commercialPersonId?: string | null
+  evaluatorPersonId?: string | null
+  evaluationScheduledAt?: string | null
+  evaluationCompletedAt?: string | null
+  saleValue?: number | null
+  saleDate?: string | null
+  closedAt?: string | null
+  lostAt?: string | null
+  createdAt: string
+  // UI helpers compatíveis
+  followUpDate?: string // alias para nextContactAt
   assignedToId?: string | null
   assignedToName?: string | null
   assignedToRole?: string | null
-  nextAction: string
-  followUpDate: string
-  lossReason?: LossReason | null
-  lossNotes?: string | null
+  interest?: string
   notes?: string | null
-  createdAt: string
-  updatedAt: string
+  lossNotes?: string | null
 }
 
 export interface Script {
   id: string
+  organizationId?: string
   title: string
-  stage: LeadStage
+  stage?: LeadStage | string
   content: string
+  active?: boolean
   updatedAt: string
 }
 
@@ -107,36 +124,40 @@ export interface Dentist {
 
 export interface ContactHistoryItem {
   id: string
+  organizationId?: string
   leadId: string
   type: string
   date: string
   summary: string
   scriptTitleUsed?: string
   registeredBy: string
+  personId?: string | null
 }
 
 export type TaskStatus = 'Pendente' | 'Em andamento' | 'Concluída'
 
 export type TaskRecurrence = 'Única' | 'Diária' | 'Semanal' | 'Mensal'
 
+// Enum real public.lead_stage
 export type LeadStage =
-  | 'Novo'
-  | 'Em Contato'
-  | 'Avaliação'
-  | 'Proposta'
-  | 'Fechado'
-  | 'Perdido'
-  | 'Em negociação'
+  | 'novo'
+  | 'avaliacao_agendada'
+  | 'nao_compareceu'
+  | 'avaliacao_realizada'
+  | 'proposta_enviada'
+  | 'fechado'
+  | 'perdido'
 
+// Enum real public.lead_origin
 export type LeadOrigin =
-  | 'Instagram'
-  | 'Google'
-  | 'Indicação'
-  | 'WhatsApp'
-  | 'Site'
-  | 'Facebook'
-  | 'Panfleto'
-  | 'Outro'
+  | 'indicacao'
+  | 'meta_ads'
+  | 'google'
+  | 'organico'
+  | 'reativacao'
+  | 'campanha'
+  | 'parceiro'
+  | 'outros'
 
 export type LeadInterest =
   | 'Implantes'

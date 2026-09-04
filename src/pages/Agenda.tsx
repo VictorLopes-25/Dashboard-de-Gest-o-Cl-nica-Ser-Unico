@@ -68,7 +68,9 @@ export default function Agenda() {
 
   // Modal para criar item manual (tarefa, compromisso, pendencia)
   const [manualModalOpen, setManualModalOpen] = useState(false)
-  const [manualType, setManualType] = useState<'tarefa' | 'compromisso' | 'pendencia'>('tarefa')
+  const [manualType, setManualType] = useState<
+    'tarefa' | 'compromisso' | 'follow_up' | 'pendencia'
+  >('tarefa')
   const [manualTitle, setManualTitle] = useState('')
   const [manualDueDate, setManualDueDate] = useState(() => new Date().toISOString().split('T')[0])
   const [manualDueTime, setManualDueTime] = useState('')
@@ -929,8 +931,9 @@ export default function Agenda() {
                 <SelectContent>
                   <SelectItem value="tarefa">Tarefa Operacional</SelectItem>
                   <SelectItem value="compromisso">Compromisso</SelectItem>
-                  <SelectItem value="pendencia">Pendência</SelectItem>
-                </SelectContent>
+                  <SelectItem value="follow_up">Follow-up Comercial</SelectItem>
+                  <SelectItem value="pendencia">Pendência Geral</SelectItem>
+                </SelectContent>{' '}
               </Select>
             </div>
 

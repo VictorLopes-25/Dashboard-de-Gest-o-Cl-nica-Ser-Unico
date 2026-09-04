@@ -27,15 +27,15 @@ interface LeadModalProps {
   defaultStage?: LeadStage
 }
 
-export const ORIGIN_OPTIONS: LeadOrigin[] = [
-  'Instagram',
-  'Google',
-  'Indicação',
-  'WhatsApp',
-  'Site',
-  'Facebook',
-  'Panfleto',
-  'Outro',
+export const ORIGIN_OPTIONS: { key: LeadOrigin; label: string }[] = [
+  { key: 'meta_ads', label: 'Meta Ads (Instagram/Facebook)' },
+  { key: 'google', label: 'Google Ads' },
+  { key: 'indicacao', label: 'Indicação' },
+  { key: 'organico', label: 'Orgânico' },
+  { key: 'reativacao', label: 'Reativação' },
+  { key: 'campanha', label: 'Campanha' },
+  { key: 'parceiro', label: 'Parceiro' },
+  { key: 'outros', label: 'Outros' },
 ]
 
 export const INTEREST_OPTIONS: LeadInterest[] = [
@@ -59,7 +59,7 @@ export const STAGES_CONFIG: {
   borderColor: string
 }[] = [
   {
-    key: 'Novo',
+    key: 'novo',
     label: 'Novo',
     color: '#64748B',
     dotColor: '#94A3B8',
@@ -68,8 +68,8 @@ export const STAGES_CONFIG: {
     borderColor: '#CBD5E1',
   },
   {
-    key: 'Em Contato',
-    label: 'Em Contato',
+    key: 'avaliacao_agendada',
+    label: 'Avaliação Agendada',
     color: '#D97706',
     dotColor: '#F59E0B',
     bgLight: '#FEF3C7',
@@ -77,8 +77,8 @@ export const STAGES_CONFIG: {
     borderColor: '#FDE68A',
   },
   {
-    key: 'Avaliação',
-    label: 'Avaliação',
+    key: 'nao_compareceu',
+    label: 'Não Compareceu',
     color: '#EA580C',
     dotColor: '#F97316',
     bgLight: '#FFEDD5',
@@ -86,8 +86,17 @@ export const STAGES_CONFIG: {
     borderColor: '#FED7AA',
   },
   {
-    key: 'Proposta',
-    label: 'Proposta',
+    key: 'avaliacao_realizada',
+    label: 'Avaliação Realizada',
+    color: '#3B82F6',
+    dotColor: '#60A5FA',
+    bgLight: '#EFF6FF',
+    textColor: '#1D4ED8',
+    borderColor: '#BFDBFE',
+  },
+  {
+    key: 'proposta_enviada',
+    label: 'Proposta Enviada',
     color: '#7C3AED',
     dotColor: '#8B5CF6',
     bgLight: '#EDE9FE',
@@ -95,7 +104,7 @@ export const STAGES_CONFIG: {
     borderColor: '#DDD6FE',
   },
   {
-    key: 'Fechado',
+    key: 'fechado',
     label: 'Fechado',
     color: '#059669',
     dotColor: '#10B981',
@@ -104,7 +113,7 @@ export const STAGES_CONFIG: {
     borderColor: '#A7F3D0',
   },
   {
-    key: 'Perdido',
+    key: 'perdido',
     label: 'Perdido',
     color: '#DC2626',
     dotColor: '#EF4444',
@@ -125,9 +134,9 @@ export function formatPhoneMask(value: string): string {
 export const LeadModal: React.FC<LeadModalProps> = ({
   open,
   onOpenChange,
-  defaultStage = 'Novo',
+  defaultStage = 'novo',
 }) => {
-  const { addLead, collaborators, dentists } = useApp()
+  const { addLead, collaborators, dentists, leads } = useApp()
 
   // Default responsible: Paula Rocha (CRC) if available
   const paulaColab = collaborators.find((c) => c.name.toLowerCase().includes('paula'))
@@ -135,23 +144,27 @@ export const LeadModal: React.FC<LeadModalProps> = ({
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [origin, setOrigin] = useState<LeadOrigin>('Instagram')
+  const [origin, setOrigin] = useState<LeadOrigin>('meta_ads')
+  const [referredByName, setReferredByName] = useState('')
   const [interest, setInterest] = useState<LeadInterest>('Implantes')
   const [stage, setStage] = useState<LeadStage>(defaultStage)
   const [assignedId, setAssignedId] = useState<string>(defaultAssignedId)
   const [nextAction, setNextAction] = useState('')
   const [followUpDate, setFollowUpDate] = useState(getTodayDateString(0))
   const [notes, setNotes] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
   const [errorName, setErrorName] = useState('')
   const [errorPhone, setErrorPhone] = useState('')
   const [errorFollowUp, setErrorFollowUp] = useState('')
+  const [errorReferred, setErrorReferred] = useState('')
 
   React.useEffect(() => {
     if (open) {
       setName('')
       setPhone('')
-      setOrigin('Instagram')
+      setOrigin('meta_ads')
+      setReferredByName('')
       setInterest('Implantes')
       setStage(defaultStage)
       setAssignedId(defaultAssignedId)
@@ -161,6 +174,8 @@ export const LeadModal: React.FC<LeadModalProps> = ({
       setErrorName('')
       setErrorPhone('')
       setErrorFollowUp('')
+      setErrorReferred('')
+      setIsSaving(false)
     }
   }, [open, defaultStage, defaultAssignedId])
 
@@ -187,11 +202,17 @@ export const LeadModal: React.FC<LeadModalProps> = ({
       hasError = true
     }
 
+    if (origin === 'indicacao' && !referredByName.trim()) {
+      setErrorReferred('Para indicação, informe o nome de quem indicou.')
+      hasError = true
+    }
+
     if (hasError) return
 
     // Find assigned responsible details (Collaborator or Dentist)
     let assignedToName: string | undefined
     let assignedToRole: string | undefined
+    let evaluatorPersonId: string | null = null
 
     const foundColab = collaborators.find((c) => c.id === assignedId)
     if (foundColab) {
@@ -202,24 +223,36 @@ export const LeadModal: React.FC<LeadModalProps> = ({
       if (foundDentist) {
         assignedToName = foundDentist.name
         assignedToRole = 'Dentistas'
+        evaluatorPersonId = foundDentist.id
       }
     }
 
+    setIsSaving(true)
     addLead({
       name: name.trim(),
       phone: phone.trim(),
       origin,
-      interest,
+      referredByName: origin === 'indicacao' ? referredByName.trim() : null,
+      campaign: interest,
       stage,
+      commercialPersonId: foundColab ? foundColab.id : null,
+      evaluatorPersonId,
       assignedToId: assignedId || undefined,
       assignedToName,
       assignedToRole,
       nextAction: nextAction.trim() || 'Aguardando primeiro contato com o paciente',
+      nextContactAt: followUpDate,
       followUpDate,
       notes: notes.trim() || undefined,
     })
-
-    onOpenChange(false)
+      .then(() => {
+        setIsSaving(false)
+        onOpenChange(false)
+      })
+      .catch((err) => {
+        setIsSaving(false)
+        alert(err.message || 'Erro ao criar lead')
+      })
   }
 
   return (
@@ -267,20 +300,46 @@ export const LeadModal: React.FC<LeadModalProps> = ({
             {/* Origem */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700">Origem</Label>
-              <Select value={origin} onValueChange={(val) => setOrigin(val as LeadOrigin)}>
+              <Select
+                value={origin}
+                onValueChange={(val) => {
+                  setOrigin(val as LeadOrigin)
+                  if (val !== 'indicacao') setErrorReferred('')
+                }}
+              >
                 <SelectTrigger className="h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {ORIGIN_OPTIONS.map((orig) => (
-                    <SelectItem key={orig} value={orig}>
-                      {orig}
+                    <SelectItem key={orig.key} value={orig.key}>
+                      {orig.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
+
+          {/* Campo condicional para Indicação */}
+          {origin === 'indicacao' && (
+            <div className="space-y-1.5 p-3 rounded-lg bg-teal-50/60 border border-teal-200">
+              <Label htmlFor="referredByName" className="text-xs font-semibold text-teal-900">
+                Quem indicou este paciente? <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="referredByName"
+                value={referredByName}
+                onChange={(e) => {
+                  setReferredByName(e.target.value)
+                  if (errorReferred) setErrorReferred('')
+                }}
+                placeholder="Ex.: Paciente Carlos Silva ou Dra. Patrícia"
+                className="h-9 text-sm bg-white"
+              />
+              {errorReferred && <p className="text-xs text-red-500">{errorReferred}</p>}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Interesse */}
@@ -406,8 +465,12 @@ export const LeadModal: React.FC<LeadModalProps> = ({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" className="bg-teal-700 hover:bg-teal-800 text-white font-medium">
-              Criar Lead
+            <Button
+              type="submit"
+              disabled={isSaving}
+              className="bg-teal-700 hover:bg-teal-800 text-white font-medium"
+            >
+              {isSaving ? 'Salvando...' : 'Criar Lead'}
             </Button>
           </DialogFooter>
         </form>

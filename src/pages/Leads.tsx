@@ -57,7 +57,7 @@ export default function Leads() {
 
   // Modals
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
-  const [defaultStageForModal, setDefaultStageForModal] = useState<LeadStage>('Novo')
+  const [defaultStageForModal, setDefaultStageForModal] = useState<LeadStage>('novo')
 
   const [lossModalOpen, setLossModalOpen] = useState(false)
   const [leadPendingLoss, setLeadPendingLoss] = useState<Lead | null>(null)
@@ -101,7 +101,7 @@ export default function Leads() {
   const handleStageChangeRequest = (lead: Lead, targetStage: LeadStage) => {
     if (lead.stage === targetStage) return
 
-    if (targetStage === 'Perdido') {
+    if (targetStage === 'perdido') {
       setLeadPendingLoss(lead)
       setLossModalOpen(true)
     } else {
@@ -110,13 +110,19 @@ export default function Leads() {
   }
 
   // Confirm loss
-  const handleConfirmLoss = (reason: any, notes?: string) => {
+  const handleConfirmLoss = async (reason: any, notes?: string) => {
     if (leadPendingLoss) {
-      moveLeadStage(leadPendingLoss.id, 'Perdido', {
-        lossReason: reason,
-        lossNotes: notes,
-      })
-      setLeadPendingLoss(null)
+      try {
+        await moveLeadStage(leadPendingLoss.id, 'perdido', {
+          lossReason: reason,
+          lossNotes: notes,
+        })
+        setLossModalOpen(false)
+      } catch (err: any) {
+        alert(err.message || 'Falha ao registrar perda do lead.')
+      } finally {
+        setLeadPendingLoss(null)
+      }
     }
   }
 
@@ -159,18 +165,23 @@ export default function Leads() {
   // Helper for origin badge styles
   const getOriginBadgeStyle = (origin: string) => {
     switch (origin) {
+      case 'meta_ads':
       case 'Instagram':
+      case 'Facebook':
         return 'bg-pink-50 text-pink-700 border-pink-200'
+      case 'google':
       case 'Google':
         return 'bg-blue-50 text-blue-700 border-blue-200'
+      case 'indicacao':
       case 'Indicação':
         return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      case 'organico':
       case 'WhatsApp':
         return 'bg-green-50 text-green-700 border-green-200'
-      case 'Site':
-        return 'bg-teal-50 text-teal-700 border-teal-200'
-      case 'Facebook':
-        return 'bg-indigo-50 text-indigo-700 border-indigo-200'
+      case 'reativacao':
+        return 'bg-amber-50 text-amber-700 border-amber-200'
+      case 'campanha':
+        return 'bg-purple-50 text-purple-700 border-purple-200'
       default:
         return 'bg-slate-50 text-slate-700 border-slate-200'
     }
@@ -244,7 +255,7 @@ export default function Leads() {
 
           <Button
             onClick={() => {
-              setDefaultStageForModal('Novo')
+              setDefaultStageForModal('novo')
               setIsLeadModalOpen(true)
             }}
             className="bg-teal-700 hover:bg-teal-800 text-white font-medium shadow-xs gap-2"
@@ -279,8 +290,8 @@ export default function Leads() {
               <SelectContent>
                 <SelectItem value="all">Todas as origens</SelectItem>
                 {ORIGIN_OPTIONS.map((orig) => (
-                  <SelectItem key={orig} value={orig}>
-                    {orig}
+                  <SelectItem key={orig.key} value={orig.key}>
+                    {orig.label}
                   </SelectItem>
                 ))}
               </SelectContent>
