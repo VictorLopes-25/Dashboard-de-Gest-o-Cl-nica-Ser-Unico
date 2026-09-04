@@ -36,11 +36,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const { roles, collaborators, addTask, updateTask, currentUser } = useApp()
 
   const [title, setTitle] = useState(taskToEdit?.title || '')
+  const [description, setDescription] = useState(taskToEdit?.description || '')
   const [roleId, setRoleId] = useState(
     taskToEdit?.roleId || defaultRoleId || currentUser?.roleId || roles[0]?.id || '',
   )
-  const [status, setStatus] = useState<TaskStatus>(taskToEdit?.status || 'Pendente')
   const [recurrence, setRecurrence] = useState<TaskRecurrence>(taskToEdit?.recurrence || 'Diária')
+  const [recurrenceDay, setRecurrenceDay] = useState<number>(taskToEdit?.recurrenceDay || 1)
   const [assignedCollaboratorId, setAssignedCollaboratorId] = useState<string>(
     taskToEdit?.assignedCollaboratorId || '',
   )
@@ -54,16 +55,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     if (open) {
       if (taskToEdit) {
         setTitle(taskToEdit.title)
+        setDescription(taskToEdit.description || '')
         setRoleId(taskToEdit.roleId)
-        setStatus(taskToEdit.status)
         setRecurrence(taskToEdit.recurrence)
+        setRecurrenceDay(taskToEdit.recurrenceDay || 1)
         setAssignedCollaboratorId(taskToEdit.assignedCollaboratorId || '')
         setDueDate(taskToEdit.dueDate)
       } else {
         setTitle('')
+        setDescription('')
         setRoleId(defaultRoleId || currentUser?.roleId || roles[0]?.id || '')
-        setStatus('Pendente')
         setRecurrence('Diária')
+        setRecurrenceDay(1)
         setAssignedCollaboratorId('')
         setDueDate(getTodayDateString(0))
       }
@@ -100,18 +103,23 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     if (taskToEdit) {
       updateTask(taskToEdit.id, {
         title: title.trim(),
+        description: description.trim() || undefined,
         roleId,
-        status,
         recurrence,
+        recurrenceDay:
+          recurrence === 'Semanal' || recurrence === 'Mensal' ? recurrenceDay : undefined,
         assignedCollaboratorId: assignedCollaboratorId || undefined,
         dueDate,
       })
     } else {
       addTask({
         title: title.trim(),
+        description: description.trim() || undefined,
         roleId,
-        status,
+        status: 'Pendente',
         recurrence,
+        recurrenceDay:
+          recurrence === 'Semanal' || recurrence === 'Mensal' ? recurrenceDay : undefined,
         assignedCollaboratorId: assignedCollaboratorId || undefined,
         dueDate,
       })
@@ -188,21 +196,6 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Status */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Status</Label>
-              <Select value={status} onValueChange={(val) => setStatus(val as TaskStatus)}>
-                <SelectTrigger className="h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Pendente">Pendente</SelectItem>
-                  <SelectItem value="Em andamento">Em andamento</SelectItem>
-                  <SelectItem value="Concluída">Concluída</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Recorrência */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700">Recorrência</Label>
@@ -221,7 +214,77 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Configuração específica de dia da semana / dia do mês */}
+            {recurrence === 'Semanal' && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Dia da semana</Label>
+                <Select
+                  value={String(recurrenceDay)}
+                  onValueChange={(val) => setRecurrenceDay(Number(val))}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Segunda-feira</SelectItem>
+                    <SelectItem value="2">Terça-feira</SelectItem>
+                    <SelectItem value="3">Quarta-feira</SelectItem>
+                    <SelectItem value="4">Quinta-feira</SelectItem>
+                    <SelectItem value="5">Sexta-feira</SelectItem>
+                    <SelectItem value="6">Sábado</SelectItem>
+                    <SelectItem value="7">Domingo</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {recurrence === 'Mensal' && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Dia do mês (1 a 31)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={31}
+                  value={recurrenceDay}
+                  onChange={(e) =>
+                    setRecurrenceDay(Math.min(31, Math.max(1, Number(e.target.value))))
+                  }
+                  className="h-10 text-sm"
+                />
+              </div>
+            )}
+
+            {recurrence !== 'Semanal' && recurrence !== 'Mensal' && (
+              <div className="space-y-1.5">
+                <Label htmlFor="dueDate" className="text-xs font-semibold text-slate-700">
+                  Data de referência / início
+                </Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="h-10 text-sm"
+                />
+              </div>
+            )}
           </div>
+
+          {(recurrence === 'Semanal' || recurrence === 'Mensal') && (
+            <div className="space-y-1.5">
+              <Label htmlFor="dueDateRec" className="text-xs font-semibold text-slate-700">
+                Data de referência / início
+              </Label>
+              <Input
+                id="dueDateRec"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="h-10 text-sm"
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Responsável Atual (Opcional - filtrado pela função) */}

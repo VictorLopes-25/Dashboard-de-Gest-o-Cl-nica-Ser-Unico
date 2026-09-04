@@ -46,10 +46,18 @@ import {
 
 export default function Tarefas() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { tasks, roles, collaborators, deleteTask, updateTask, toggleTaskCompletion } = useApp()
+  const {
+    tasks,
+    roles,
+    collaborators,
+    deleteTask,
+    setTaskActive,
+    updateTask,
+    toggleTaskCompletion,
+  } = useApp()
 
+  const [activeTab, setActiveTab] = useState<'ativas' | 'inativas'>('ativas')
   const filterRole = searchParams.get('funcao') || 'all'
-  const filterStatus = searchParams.get('status') || 'all'
   const filterRecurrence = searchParams.get('recorrencia') || 'all'
   const filterSearch = searchParams.get('busca') || ''
 
@@ -75,10 +83,11 @@ export default function Tarefas() {
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
+      const isTaskActive = task.active ?? true
+      if (activeTab === 'ativas' && !isTaskActive) return false
+      if (activeTab === 'inativas' && isTaskActive) return false
+
       if (filterRole !== 'all' && task.roleId !== filterRole) {
-        return false
-      }
-      if (filterStatus !== 'all' && task.status !== filterStatus) {
         return false
       }
       if (filterRecurrence !== 'all' && task.recurrence !== filterRecurrence) {
@@ -89,7 +98,7 @@ export default function Tarefas() {
       }
       return true
     })
-  }, [tasks, filterRole, filterStatus, filterRecurrence, filterSearch])
+  }, [tasks, activeTab, filterRole, filterRecurrence, filterSearch])
 
   const handleOpenCreate = () => {
     setTaskToEdit(null)
@@ -177,25 +186,11 @@ export default function Tarefas() {
           </div>
 
           <div>
-            <Select value={filterStatus} onValueChange={(val) => updateQueryParam('status', val)}>
-              <SelectTrigger className="h-10 text-sm">
-                <SelectValue placeholder="Todos os status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os status</SelectItem>
-                <SelectItem value="Pendente">Pendente</SelectItem>
-                <SelectItem value="Em andamento">Em andamento</SelectItem>
-                <SelectItem value="Concluída">Concluída</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-2">
             <Select
               value={filterRecurrence}
               onValueChange={(val) => updateQueryParam('recorrencia', val)}
             >
-              <SelectTrigger className="h-10 text-sm flex-1">
+              <SelectTrigger className="h-10 text-sm">
                 <SelectValue placeholder="Recorrência" />
               </SelectTrigger>
               <SelectContent>
@@ -206,11 +201,35 @@ export default function Tarefas() {
                 <SelectItem value="Mensal">Mensal</SelectItem>
               </SelectContent>
             </Select>
+          </div>
 
-            {(filterRole !== 'all' ||
-              filterStatus !== 'all' ||
-              filterRecurrence !== 'all' ||
-              filterSearch !== '') && (
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-lg bg-slate-100 p-0.5 border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setActiveTab('ativas')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${
+                  activeTab === 'ativas'
+                    ? 'bg-white text-teal-800 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Ativas
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('inativas')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${
+                  activeTab === 'inativas'
+                    ? 'bg-white text-teal-800 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Inativas
+              </button>
+            </div>
+
+            {(filterRole !== 'all' || filterRecurrence !== 'all' || filterSearch !== '') && (
               <Button
                 variant="outline"
                 size="icon"
@@ -241,58 +260,41 @@ export default function Tarefas() {
         <Table>
           <TableHeader className="bg-slate-50/80">
             <TableRow>
-              <TableHead className="w-[45px]"></TableHead>
               <TableHead className="font-semibold text-slate-700">Título</TableHead>
               <TableHead className="font-semibold text-slate-700">Função</TableHead>
-              <TableHead className="font-semibold text-slate-700">Status</TableHead>
               <TableHead className="font-semibold text-slate-700">Recorrência</TableHead>
-              <TableHead className="font-semibold text-slate-700">Responsável Atual</TableHead>
-              <TableHead className="font-semibold text-slate-700">Vencimento</TableHead>
+              <TableHead className="font-semibold text-slate-700">Responsável Padrão</TableHead>
+              <TableHead className="font-semibold text-slate-700">Início / Referência</TableHead>
+              <TableHead className="font-semibold text-slate-700">Situação</TableHead>
               <TableHead className="text-right font-semibold text-slate-700">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredTasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12 text-slate-400">
+                <TableCell colSpan={7} className="text-center py-12 text-slate-400">
                   Nenhuma tarefa encontrada com os filtros selecionados.
                 </TableCell>
               </TableRow>
             ) : (
               filteredTasks.map((task) => {
                 const role = roles.find((r) => r.id === task.roleId)
-                const isCompleted = task.status === 'Concluída'
-                const isOverdue = task.dueDate < todayStr && !isCompleted
+                const isTaskActive = task.active ?? true
 
                 return (
                   <TableRow
                     key={task.id}
                     className={`hover:bg-slate-50/70 transition-colors ${
-                      isCompleted ? 'bg-slate-50/40 text-slate-400' : ''
+                      !isTaskActive ? 'bg-slate-50/50 opacity-60' : ''
                     }`}
                   >
-                    <TableCell className="pl-4">
-                      <button
-                        type="button"
-                        onClick={() => toggleTaskCompletion(task.id)}
-                        className="text-slate-400 hover:text-teal-700 transition"
-                      >
-                        {isCompleted ? (
-                          <CheckCircle2 className="w-5 h-5 text-emerald-600 fill-emerald-50" />
-                        ) : (
-                          <Circle className="w-5 h-5 hover:text-teal-600" />
-                        )}
-                      </button>
-                    </TableCell>
-
                     <TableCell className="font-medium max-w-xs">
-                      <span
-                        className={`text-sm ${
-                          isCompleted ? 'line-through text-slate-400' : 'text-slate-900'
-                        }`}
-                      >
-                        {task.title}
-                      </span>
+                      <div>
+                        <span className="text-sm text-slate-900 font-semibold">{task.title}</span>
+                        {task.description && (
+                          <p className="text-xs text-slate-500 line-clamp-1">{task.description}</p>
+                        )}
+                      </div>
                     </TableCell>
 
                     <TableCell>
@@ -317,34 +319,24 @@ export default function Tarefas() {
                     </TableCell>
 
                     <TableCell>
-                      <Select
-                        value={task.status}
-                        onValueChange={(val) => {
-                          if (val === 'Concluída' && task.status !== 'Concluída') {
-                            toggleTaskCompletion(task.id)
-                          } else {
-                            updateTask(task.id, {
-                              status: val as TaskStatus,
-                              completedAt:
-                                val === 'Concluída' ? new Date().toISOString() : undefined,
-                            })
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="h-8 text-xs w-[130px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Pendente">Pendente</SelectItem>
-                          <SelectItem value="Em andamento">Em andamento</SelectItem>
-                          <SelectItem value="Concluída">Concluída</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-
-                    <TableCell>
                       <span className="text-xs px-2 py-0.5 rounded-md font-medium bg-slate-100 text-slate-700 border border-slate-200">
                         {task.recurrence}
+                        {task.recurrence === 'Semanal' && task.recurrenceDay && (
+                          <span className="text-[11px] text-slate-500 ml-1">
+                            (
+                            {
+                              ['', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'][
+                                task.recurrenceDay
+                              ]
+                            }
+                            )
+                          </span>
+                        )}
+                        {task.recurrence === 'Mensal' && task.recurrenceDay && (
+                          <span className="text-[11px] text-slate-500 ml-1">
+                            (dia {task.recurrenceDay})
+                          </span>
+                        )}
                       </span>
                     </TableCell>
 
@@ -353,16 +345,19 @@ export default function Tarefas() {
                     </TableCell>
 
                     <TableCell>
-                      <div className="flex flex-col">
-                        <span className="text-xs text-slate-800">
-                          {formatDatePTBR(task.dueDate)}
+                      <span className="text-xs text-slate-800">{formatDatePTBR(task.dueDate)}</span>
+                    </TableCell>
+
+                    <TableCell>
+                      {isTaskActive ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          Ativa
                         </span>
-                        {isOverdue && (
-                          <span className="text-[10px] font-bold text-red-600 flex items-center gap-0.5">
-                            <AlertCircle className="w-3 h-3" /> Atrasada
-                          </span>
-                        )}
-                      </div>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                          Desativada
+                        </span>
+                      )}
                     </TableCell>
 
                     <TableCell className="text-right pr-4">
@@ -372,19 +367,30 @@ export default function Tarefas() {
                           size="icon"
                           onClick={() => handleOpenEdit(task)}
                           className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50"
-                          title="Editar tarefa"
+                          title="Editar modelo de tarefa"
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setTaskToDelete(task)}
-                          className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                          title="Excluir tarefa"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {isTaskActive ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setTaskToDelete(task)}
+                            className="h-8 w-8 text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                            title="Desativar tarefa"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setTaskActive(task.id, true)}
+                            className="text-xs text-teal-700 hover:text-teal-800 hover:bg-teal-50 px-2 h-8"
+                          >
+                            Reativar
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -403,55 +409,38 @@ export default function Tarefas() {
         ) : (
           filteredTasks.map((task) => {
             const role = roles.find((r) => r.id === task.roleId)
-            const isCompleted = task.status === 'Concluída'
-            const isOverdue = task.dueDate < todayStr && !isCompleted
+            const isTaskActive = task.active ?? true
 
             return (
               <div
                 key={task.id}
                 className={`p-4 rounded-xl border bg-white shadow-2xs space-y-3 ${
-                  isCompleted ? 'opacity-70 bg-slate-50' : ''
+                  !isTaskActive ? 'opacity-60 bg-slate-50' : ''
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => toggleTaskCompletion(task.id)}
-                      className="mt-0.5 text-slate-400"
-                    >
-                      {isCompleted ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600 fill-emerald-50" />
-                      ) : (
-                        <Circle className="w-5 h-5" />
-                      )}
-                    </button>
-                    <div>
-                      <p
-                        className={`text-sm font-semibold ${
-                          isCompleted ? 'line-through text-slate-400' : 'text-slate-900'
-                        }`}
-                      >
-                        {task.title}
-                      </p>
-                      {role && (
-                        <div className="mt-1">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{task.title}</p>
+                    {task.description && (
+                      <p className="text-xs text-slate-500 mt-0.5">{task.description}</p>
+                    )}
+                    {role && (
+                      <div className="mt-1">
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                          style={{
+                            backgroundColor: role.bgLight,
+                            color: role.textColor,
+                          }}
+                        >
                           <span
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                            style={{
-                              backgroundColor: role.bgLight,
-                              color: role.textColor,
-                            }}
-                          >
-                            <span
-                              className="w-1.5 h-1.5 rounded-full"
-                              style={{ backgroundColor: role.color }}
-                            />
-                            <span>{role.name}</span>
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: role.color }}
+                          />
+                          <span>{role.name}</span>
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
@@ -463,14 +452,25 @@ export default function Tarefas() {
                     >
                       <Pencil className="w-3.5 h-3.5" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setTaskToDelete(task)}
-                      className="h-8 w-8 text-red-500"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                    {isTaskActive ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setTaskToDelete(task)}
+                        className="h-8 w-8 text-amber-500"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setTaskActive(task.id, true)}
+                        className="text-xs text-teal-700"
+                      >
+                        Reativar
+                      </Button>
+                    )}
                   </div>
                 </div>
 
@@ -486,9 +486,7 @@ export default function Tarefas() {
 
                   <div className="flex items-center gap-1">
                     <Calendar className="w-3 h-3 text-slate-400" />
-                    <span className={isOverdue ? 'text-red-600 font-bold' : 'text-slate-600'}>
-                      {formatDatePTBR(task.dueDate)} {isOverdue && '(Atrasada)'}
-                    </span>
+                    <span className="text-slate-600">{formatDatePTBR(task.dueDate)}</span>
                   </div>
                 </div>
               </div>
@@ -507,19 +505,20 @@ export default function Tarefas() {
       <AlertDialog open={!!taskToDelete} onOpenChange={(open) => !open && setTaskToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Tarefa?</AlertDialogTitle>
+            <AlertDialogTitle>Desativar Tarefa?</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza de que deseja remover a tarefa "<strong>{taskToDelete?.title}</strong>"?
-              Esta ação não poderá ser desfeita.
+              Deseja desativar o modelo de tarefa "<strong>{taskToDelete?.title}</strong>"? Novas
+              ocorrências futuras não serão geradas. Ocorrências passadas e concluídas são
+              preservadas no histórico.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-amber-600 hover:bg-amber-700 text-white"
             >
-              Excluir
+              Desativar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

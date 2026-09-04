@@ -28,12 +28,35 @@ export interface Task {
   id: string
   title: string
   roleId: string
+  areaId?: string | null
   status: TaskStatus
   recurrence: TaskRecurrence
+  recurrenceDay?: number | null
   assignedCollaboratorId?: string | null
   dueDate: string
   createdAt: string
   completedAt?: string | null
+  active?: boolean
+  description?: string | null
+}
+
+export interface AgendaItem {
+  id: string
+  organizationId: string
+  type: 'tarefa' | 'compromisso' | 'pendencia'
+  title: string
+  dueDate: string // YYYY-MM-DD
+  dueTime?: string | null
+  status: 'aberto' | 'concluido' | 'cancelado'
+  functionId?: string | null
+  personId?: string | null
+  sourceType?: string | null
+  sourceId?: string | null
+  notes?: string | null
+  feedback?: string | null
+  transferred?: boolean
+  completedAt?: string | null
+  createdAt: string
 }
 
 export interface Lead {

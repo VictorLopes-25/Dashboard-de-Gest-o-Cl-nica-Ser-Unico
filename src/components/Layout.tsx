@@ -4,6 +4,7 @@ import { useApp } from '@/context/AppContext'
 import {
   LayoutGrid,
   CheckSquare,
+  CalendarDays,
   Users2,
   FileText,
   BadgeCheck,
@@ -26,7 +27,8 @@ export default function Layout() {
   // Determine current page title based on route
   const getPageTitle = (path: string) => {
     if (path.startsWith('/dashboard')) return 'ERP — Dashboard'
-    if (path.startsWith('/tarefas')) return 'ERP — Tarefas por Função'
+    if (path.startsWith('/agenda')) return 'ERP — Agenda Unificada'
+    if (path.startsWith('/tarefas')) return 'ERP — Modelos de Tarefas'
     if (path.startsWith('/crm/leads/')) return 'CRM — Detalhe do Lead'
     if (path.startsWith('/crm/scripts')) return 'CRM — Scripts de Atendimento'
     if (path.startsWith('/crm')) return 'CRM — Funil de Leads'
@@ -71,6 +73,7 @@ export default function Layout() {
       group: 'ERP',
       items: [
         { label: 'Dashboard', path: '/dashboard', icon: LayoutGrid },
+        { label: 'Agenda', path: '/agenda', icon: CalendarDays },
         { label: 'Tarefas', path: '/tarefas', icon: CheckSquare },
       ],
     },

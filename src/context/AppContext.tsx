@@ -3,7 +3,6 @@ import {
   INITIAL_ROLES,
   INITIAL_COLLABORATORS,
   INITIAL_DENTISTS,
-  INITIAL_TASKS,
   INITIAL_LEADS,
   INITIAL_SCRIPTS,
   INITIAL_CONTACT_HISTORY,
@@ -13,6 +12,7 @@ import type {
   AuthUser,
   Role,
   Task,
+  AgendaItem,
   Lead,
   Script,
   Collaborator,
@@ -45,6 +45,24 @@ import {
   type DbFunctionAssignment,
 } from '@/services/functionAssignmentsService'
 import { fetchAreas, type DbArea } from '@/services/areasService'
+import {
+  fetchTasks as fetchTasksService,
+  createTask as createTaskService,
+  updateTask as updateTaskService,
+  setTaskActive as setTaskActiveService,
+  type DbTask,
+  type DbRecurrenceType,
+} from '@/services/tasksService'
+import {
+  fetchTodayAgenda,
+  fetchAgendaWindow,
+  completeAgendaItem as completeAgendaItemService,
+  reopenAgendaItem as reopenAgendaItemService,
+  cancelAgendaItem as cancelAgendaItemService,
+  createManualAgendaItem,
+  type DbAgendaItem,
+  type TodayAgendaData,
+} from '@/services/agendaService'
 
 export type { AuthUser }
 
@@ -157,31 +175,73 @@ function dentistToDb(d: Partial<Dentist>): any {
   return out
 }
 
-function mapDbTask(t: any): Task {
-  return {
-    id: t.id,
-    title: t.title,
-    roleId: t.role_id,
-    status: t.status as TaskStatus,
-    recurrence: t.recurrence as TaskRecurrence,
-    assignedCollaboratorId: t.assigned_collaborator_id || null,
-    dueDate: t.due_date || getTodayDateString(0),
-    completedAt: t.completed_at || null,
-    createdAt: t.created_at,
+// Conversão de enums de recorrência UI <-> DB
+export function dbRecurrenceToUi(dbRec: DbRecurrenceType): TaskRecurrence {
+  switch (dbRec) {
+    case 'diaria':
+      return 'Diária'
+    case 'semanal':
+      return 'Semanal'
+    case 'mensal':
+      return 'Mensal'
+    case 'pontual':
+    case 'data_especifica':
+    default:
+      return 'Única'
   }
 }
 
-function taskToDb(t: Partial<Task>): any {
-  const out: any = {}
-  if (t.title !== undefined) out.title = t.title
-  if (t.roleId !== undefined) out.role_id = t.roleId
-  if (t.status !== undefined) out.status = t.status
-  if (t.recurrence !== undefined) out.recurrence = t.recurrence
-  if (t.assignedCollaboratorId !== undefined)
-    out.assigned_collaborator_id = t.assignedCollaboratorId
-  if (t.dueDate !== undefined) out.due_date = t.dueDate
-  if (t.completedAt !== undefined) out.completed_at = t.completedAt
-  return out
+export function uiRecurrenceToDb(uiRec: TaskRecurrence): DbRecurrenceType {
+  switch (uiRec) {
+    case 'Diária':
+      return 'diaria'
+    case 'Semanal':
+      return 'semanal'
+    case 'Mensal':
+      return 'mensal'
+    case 'Única':
+    default:
+      return 'pontual'
+  }
+}
+
+function mapDbTaskToUi(t: DbTask): Task {
+  return {
+    id: t.id,
+    title: t.title,
+    roleId: t.function_id || '',
+    areaId: t.area_id,
+    status: 'Pendente', // status operacional vive em agenda_items
+    recurrence: dbRecurrenceToUi(t.recurrence),
+    recurrenceDay: t.recurrence_day,
+    assignedCollaboratorId: t.default_person_id,
+    dueDate: t.due_date || t.created_at.slice(0, 10),
+    createdAt: t.created_at,
+    completedAt: null,
+    active: t.active,
+    description: t.description,
+  }
+}
+
+function mapDbAgendaItemToUi(item: DbAgendaItem): AgendaItem {
+  return {
+    id: item.id,
+    organizationId: item.organization_id,
+    type: item.type,
+    title: item.title,
+    dueDate: item.due_date,
+    dueTime: item.due_time,
+    status: item.status,
+    functionId: item.function_id,
+    personId: item.person_id,
+    sourceType: item.source_type,
+    sourceId: item.source_id,
+    notes: item.notes,
+    feedback: item.feedback,
+    transferred: item.transferred,
+    completedAt: item.completed_at,
+    createdAt: item.created_at,
+  }
 }
 
 function mapDbLead(l: any): Lead {
@@ -282,6 +342,8 @@ interface AppContextType {
   collaborators: Collaborator[]
   dentists: Dentist[]
   tasks: Task[]
+  agendaItems: AgendaItem[]
+  overdueAgendaItems: AgendaItem[]
   leads: Lead[]
   scripts: Script[]
   contactHistory: ContactHistoryItem[]
@@ -305,10 +367,29 @@ interface AppContextType {
   updateDentist: (id: string, updates: Partial<Dentist>) => Promise<void>
   deleteDentist: (id: string) => Promise<void>
 
-  // CRUD Tarefas
+  // CRUD Tarefas (Templates em public.tasks)
   addTask: (task: Omit<Task, 'id' | 'createdAt'>) => Promise<Task | null>
   updateTask: (id: string, updates: Partial<Task>) => Promise<void>
   deleteTask: (id: string) => Promise<void>
+  setTaskActive: (id: string, active: boolean) => Promise<void>
+
+  // Agenda Operations (Ocorrências em public.agenda_items)
+  completeAgendaItem: (id: string) => Promise<void>
+  reopenAgendaItem: (id: string) => Promise<void>
+  cancelAgendaItem: (id: string) => Promise<void>
+  addManualAgendaItem: (payload: {
+    type: 'tarefa' | 'compromisso' | 'pendencia'
+    title: string
+    dueDate: string
+    dueTime?: string | null
+    functionId?: string | null
+    personId?: string | null
+    notes?: string | null
+  }) => Promise<AgendaItem | null>
+  loadAgendaWindow: (
+    startDate: string,
+    endDate: string,
+  ) => Promise<{ items: AgendaItem[]; overdue: AgendaItem[] }>
   toggleTaskCompletion: (id: string) => Promise<void>
 
   // CRUD Leads
@@ -362,7 +443,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [roles, setRoles] = useState<Role[]>(INITIAL_ROLES)
   const [collaborators, setCollaborators] = useState<Collaborator[]>(INITIAL_COLLABORATORS)
   const [dentists, setDentists] = useState<Dentist[]>(INITIAL_DENTISTS)
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([])
+  const [overdueAgendaItems, setOverdueAgendaItems] = useState<AgendaItem[]>([])
   const [leads, setLeads] = useState<Lead[]>(INITIAL_LEADS)
   const [scripts, setScripts] = useState<Script[]>(INITIAL_SCRIPTS)
   const [contactHistory, setContactHistory] =
@@ -427,6 +510,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       setRoles(mappedRoles)
       setCollaborators(mappedCollaborators)
+
+      // 4. Buscar tarefas do Supabase (public.tasks)
+      const dbTasks = await fetchTasksService(true)
+      const mappedTasks = dbTasks.map(mapDbTaskToUi)
+      setTasks(mappedTasks)
+
+      // 5. Carregar Agenda do Dia (public.agenda_items com Today View + Atrasados)
+      const today = new Date().toISOString().split('T')[0]
+      const todayAgenda = await fetchTodayAgenda(today)
+      const allTodayUi = [...todayAgenda.todayOpen, ...todayAgenda.todayCompleted].map(
+        mapDbAgendaItemToUi,
+      )
+      const overdueUi = todayAgenda.overdue.map(mapDbAgendaItemToUi)
+
+      setAgendaItems(allTodayUi)
+      setOverdueAgendaItems(overdueUi)
     } catch (err) {
       console.error('Erro crítico ao carregar dados estruturais do Supabase:', err)
       // Conforme Regra 7: NÃO fazer fallback silencioso para mocks. Erros claramente sinalizados.
@@ -613,34 +712,224 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }
 
   // ----------------------------------------------------------------
-  // CRUD — Tarefas
+  // CRUD — Tarefas (public.tasks via Supabase)
   // ----------------------------------------------------------------
 
   const addTask = async (taskData: Omit<Task, 'id' | 'createdAt'>): Promise<Task | null> => {
-    const localTask: Task = {
-      ...taskData,
-      id: `task-local-${Date.now()}`,
-      createdAt: new Date().toISOString(),
+    try {
+      const created = await createTaskService({
+        title: taskData.title,
+        description: taskData.description || null,
+        function_id: taskData.roleId || null,
+        area_id: taskData.areaId || null,
+        recurrence: uiRecurrenceToDb(taskData.recurrence),
+        recurrence_day: taskData.recurrenceDay ?? null,
+        due_date: taskData.dueDate || null,
+        default_person_id: taskData.assignedCollaboratorId || null,
+        active: taskData.active ?? true,
+      })
+
+      const mapped = mapDbTaskToUi(created)
+      setTasks((prev) => [mapped, ...prev])
+
+      // Atualiza ocorrências na agenda para hoje
+      const today = new Date().toISOString().split('T')[0]
+      const todayAgenda = await fetchTodayAgenda(today)
+      setAgendaItems(
+        [...todayAgenda.todayOpen, ...todayAgenda.todayCompleted].map(mapDbAgendaItemToUi),
+      )
+      setOverdueAgendaItems(todayAgenda.overdue.map(mapDbAgendaItemToUi))
+
+      return mapped
+    } catch (err) {
+      console.error('Falha ao criar tarefa no Supabase:', err)
+      throw err
     }
-    setTasks((prev) => [localTask, ...prev])
-    return localTask
   }
 
   const updateTask = async (id: string, updates: Partial<Task>) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)))
+    try {
+      const dbUpdates: any = {}
+      if (updates.title !== undefined) dbUpdates.title = updates.title
+      if (updates.description !== undefined) dbUpdates.description = updates.description
+      if (updates.roleId !== undefined) dbUpdates.function_id = updates.roleId
+      if (updates.areaId !== undefined) dbUpdates.area_id = updates.areaId
+      if (updates.recurrence !== undefined)
+        dbUpdates.recurrence = uiRecurrenceToDb(updates.recurrence)
+      if (updates.recurrenceDay !== undefined) dbUpdates.recurrence_day = updates.recurrenceDay
+      if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate
+      if (updates.assignedCollaboratorId !== undefined)
+        dbUpdates.default_person_id = updates.assignedCollaboratorId || null
+      if (updates.active !== undefined) dbUpdates.active = updates.active
+
+      const updated = await updateTaskService(id, dbUpdates)
+      const mapped = mapDbTaskToUi(updated)
+
+      setTasks((prev) => prev.map((t) => (t.id === id ? mapped : t)))
+    } catch (err) {
+      console.error('Falha ao atualizar tarefa no Supabase:', err)
+      throw err
+    }
   }
 
   const deleteTask = async (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id))
+    // Regra 7: Desativação (active=false), para geração de ocorrências futuras e cancela futuras abertas
+    try {
+      await setTaskActiveService(id, false)
+      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, active: false } : t)))
+
+      // Recarrega agenda de hoje para refletir cancelamento
+      const today = new Date().toISOString().split('T')[0]
+      const todayAgenda = await fetchTodayAgenda(today)
+      setAgendaItems(
+        [...todayAgenda.todayOpen, ...todayAgenda.todayCompleted].map(mapDbAgendaItemToUi),
+      )
+    } catch (err) {
+      console.error('Falha ao desativar tarefa no Supabase:', err)
+      throw err
+    }
   }
 
+  const setTaskActive = async (id: string, active: boolean) => {
+    try {
+      const updated = await setTaskActiveService(id, active)
+      const mapped = mapDbTaskToUi(updated)
+      setTasks((prev) => prev.map((t) => (t.id === id ? mapped : t)))
+
+      const today = new Date().toISOString().split('T')[0]
+      const todayAgenda = await fetchTodayAgenda(today)
+      setAgendaItems(
+        [...todayAgenda.todayOpen, ...todayAgenda.todayCompleted].map(mapDbAgendaItemToUi),
+      )
+      setOverdueAgendaItems(todayAgenda.overdue.map(mapDbAgendaItemToUi))
+    } catch (err) {
+      console.error('Falha ao alterar status de atividade da tarefa:', err)
+      throw err
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // Operações em Agenda (public.agenda_items via Supabase)
+  // ----------------------------------------------------------------
+
+  const completeAgendaItem = async (id: string) => {
+    try {
+      const updated = await completeAgendaItemService(id)
+      const uiItem = mapDbAgendaItemToUi(updated)
+
+      setAgendaItems((prev) => prev.map((i) => (i.id === id ? uiItem : i)))
+      setOverdueAgendaItems((prev) => prev.filter((i) => i.id !== id))
+    } catch (err) {
+      console.error('Falha ao concluir item na agenda:', err)
+      throw err
+    }
+  }
+
+  const reopenAgendaItem = async (id: string) => {
+    try {
+      const updated = await reopenAgendaItemService(id)
+      const uiItem = mapDbAgendaItemToUi(updated)
+
+      setAgendaItems((prev) => prev.map((i) => (i.id === id ? uiItem : i)))
+      const today = new Date().toISOString().split('T')[0]
+      if (uiItem.dueDate < today) {
+        setOverdueAgendaItems((prev) => {
+          if (prev.some((i) => i.id === id)) return prev
+          return [...prev, uiItem]
+        })
+      }
+    } catch (err) {
+      console.error('Falha ao reabrir item na agenda:', err)
+      throw err
+    }
+  }
+
+  const cancelAgendaItem = async (id: string) => {
+    try {
+      const updated = await cancelAgendaItemService(id)
+      const uiItem = mapDbAgendaItemToUi(updated)
+
+      setAgendaItems((prev) => prev.map((i) => (i.id === id ? uiItem : i)))
+      setOverdueAgendaItems((prev) => prev.filter((i) => i.id !== id))
+    } catch (err) {
+      console.error('Falha ao cancelar item na agenda:', err)
+      throw err
+    }
+  }
+
+  const addManualAgendaItem = async (payload: {
+    type: 'tarefa' | 'compromisso' | 'pendencia'
+    title: string
+    dueDate: string
+    dueTime?: string | null
+    functionId?: string | null
+    personId?: string | null
+    notes?: string | null
+  }): Promise<AgendaItem | null> => {
+    try {
+      const created = await createManualAgendaItem({
+        type: payload.type,
+        title: payload.title,
+        due_date: payload.dueDate,
+        due_time: payload.dueTime ?? null,
+        function_id: payload.functionId ?? null,
+        person_id: payload.personId ?? null,
+        notes: payload.notes ?? null,
+      })
+      const uiItem = mapDbAgendaItemToUi(created)
+      setAgendaItems((prev) => [uiItem, ...prev])
+      return uiItem
+    } catch (err) {
+      console.error('Falha ao criar item manual na agenda:', err)
+      throw err
+    }
+  }
+
+  const loadAgendaWindow = async (
+    startDate: string,
+    endDate: string,
+  ): Promise<{ items: AgendaItem[]; overdue: AgendaItem[] }> => {
+    try {
+      const res = await fetchAgendaWindow(startDate, endDate, true)
+      return {
+        items: res.items.map(mapDbAgendaItemToUi),
+        overdue: res.overdue.map(mapDbAgendaItemToUi),
+      }
+    } catch (err) {
+      console.error('Falha ao carregar janela de agenda:', err)
+      throw err
+    }
+  }
+
+  // Compatibilidade com toggleTaskCompletion para callers legados ou UI de agenda
   const toggleTaskCompletion = async (id: string) => {
+    // Procura primeiro em agendaItems
+    const agendaItem =
+      agendaItems.find((i) => i.id === id) || overdueAgendaItems.find((i) => i.id === id)
+    if (agendaItem) {
+      if (agendaItem.status === 'concluido') {
+        await reopenAgendaItem(id)
+      } else {
+        await completeAgendaItem(id)
+      }
+      return
+    }
+
+    // Se for id de task template, busca ocorrência de hoje para essa task ou cria
     const task = tasks.find((t) => t.id === id)
-    if (!task) return
-    const isNowCompleted = task.status !== 'Concluída'
-    const newStatus: TaskStatus = isNowCompleted ? 'Concluída' : 'Pendente'
-    const completedAt = isNowCompleted ? new Date().toISOString() : null
-    await updateTask(id, { status: newStatus, completedAt })
+    if (task) {
+      const today = new Date().toISOString().split('T')[0]
+      const matchingAgenda =
+        agendaItems.find((i) => i.sourceId === id && i.dueDate === today) ||
+        overdueAgendaItems.find((i) => i.sourceId === id)
+      if (matchingAgenda) {
+        if (matchingAgenda.status === 'concluido') {
+          await reopenAgendaItem(matchingAgenda.id)
+        } else {
+          await completeAgendaItem(matchingAgenda.id)
+        }
+      }
+    }
   }
 
   // ----------------------------------------------------------------
@@ -718,7 +1007,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const resetData = async () => {
     await refreshData()
     setDentists(INITIAL_DENTISTS)
-    setTasks(INITIAL_TASKS)
     setLeads(INITIAL_LEADS)
     setScripts(INITIAL_SCRIPTS)
     setContactHistory(INITIAL_CONTACT_HISTORY)
@@ -737,6 +1025,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         collaborators,
         dentists,
         tasks,
+        agendaItems,
+        overdueAgendaItems,
         leads,
         scripts,
         contactHistory,
@@ -754,6 +1044,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addTask,
         updateTask,
         deleteTask,
+        setTaskActive,
+        completeAgendaItem,
+        reopenAgendaItem,
+        cancelAgendaItem,
+        addManualAgendaItem,
+        loadAgendaWindow,
         toggleTaskCompletion,
         addLead,
         updateLead,

@@ -22,7 +22,16 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const { currentUser, tasks, roles, leads, collaborators, toggleTaskCompletion } = useApp()
+  const {
+    currentUser,
+    tasks,
+    roles,
+    leads,
+    collaborators,
+    agendaItems,
+    overdueAgendaItems,
+    toggleTaskCompletion,
+  } = useApp()
 
   const [taskModalOpen, setTaskModalOpen] = useState(false)
   const todayStr = getTodayDateString(0)
@@ -50,39 +59,29 @@ export default function Dashboard() {
   const userRoleId = currentUser?.roleId || ''
 
   // 1. STATS CALCULATIONS
-  // A) Tarefas de hoje da função do usuário (vencimento hoje, atrasadas ou recorrência diária)
-  const userRoleTasksToday = tasks.filter((t) => {
-    if (t.roleId !== userRoleId) return false
-    const isToday = t.dueDate === todayStr
-    const isOverdue = t.dueDate < todayStr && t.status !== 'Concluída'
-    const isDaily = t.recurrence === 'Diária'
-    return isToday || isOverdue || isDaily
+  // A) Tarefas de hoje da função do usuário
+  const userRoleAgendaToday = agendaItems.filter((i) => {
+    if (userRoleId && i.functionId && i.functionId !== userRoleId) return false
+    return i.dueDate === todayStr && i.status === 'aberto'
   })
 
   // B) Concluídas hoje (global ou no escopo do sistema)
-  const completedTodayTasks = tasks.filter((t) => {
-    if (t.status !== 'Concluída') return false
-    if (t.completedAt) {
-      return t.completedAt.startsWith(todayStr)
-    }
-    return t.dueDate === todayStr
-  })
+  const completedTodayTasks = agendaItems.filter(
+    (i) => i.status === 'concluido' && i.dueDate === todayStr,
+  )
 
-  // C) Atrasadas (todas as pendentes/em andamento com dueDate < hoje)
-  const overdueTasks = tasks.filter((t) => t.status !== 'Concluída' && t.dueDate < todayStr)
+  // C) Atrasadas
+  const overdueTasks = overdueAgendaItems.filter((i) => i.status === 'aberto')
 
   // D) Follow-ups de hoje (leads com followUpDate <= hoje e não fechados/perdidos)
   const followUpsToday = leads.filter(
     (l) => l.stage !== 'Fechado' && l.stage !== 'Perdido' && l.followUpDate <= todayStr,
   )
 
-  // Minhas tarefas de hoje: tarefas da função do usuário logado (pendentes e concluídas hoje)
-  const myTasks = tasks.filter((t) => {
-    if (t.roleId !== userRoleId) return false
-    const isToday = t.dueDate === todayStr
-    const isOverdue = t.dueDate < todayStr && t.status !== 'Concluída'
-    const isDaily = t.recurrence === 'Diária'
-    return isToday || isOverdue || isDaily
+  // Minhas tarefas de hoje: agenda da função do usuário logado (pendentes e concluídas hoje)
+  const myTasks = agendaItems.filter((i) => {
+    if (userRoleId && i.functionId && i.functionId !== userRoleId) return false
+    return i.dueDate === todayStr
   })
 
   // Recurrence badge color helper
@@ -162,7 +161,7 @@ export default function Dashboard() {
           </div>
           <div className="min-w-0">
             <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {userRoleTasksToday.length}
+              {userRoleAgendaToday.length}
             </div>
             <p
               className="text-xs font-medium text-slate-500 truncate"
@@ -232,7 +231,7 @@ export default function Dashboard() {
               </p>
             </div>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
-              {myTasks.filter((t) => t.status !== 'Concluída').length} pendentes
+              {myTasks.filter((i) => i.status === 'aberto').length} pendentes
             </span>
           </div>
 
@@ -250,14 +249,14 @@ export default function Dashboard() {
                 </p>
               </div>
             ) : (
-              myTasks.map((task) => {
-                const isCompleted = task.status === 'Concluída'
-                const isOverdue = task.dueDate < todayStr && !isCompleted
-                const assignedName = getCollaboratorName(task.assignedCollaboratorId)
+              myTasks.map((item) => {
+                const isCompleted = item.status === 'concluido'
+                const isOverdue = item.dueDate < todayStr && item.status === 'aberto'
+                const assignedName = getCollaboratorName(item.personId || undefined)
 
                 return (
                   <div
-                    key={task.id}
+                    key={item.id}
                     className={`p-3.5 rounded-xl border transition-all ${
                       isCompleted
                         ? 'bg-slate-50/60 border-slate-200 opacity-75'
@@ -270,7 +269,7 @@ export default function Dashboard() {
                       {/* Checkbox button */}
                       <button
                         type="button"
-                        onClick={() => toggleTaskCompletion(task.id)}
+                        onClick={() => toggleTaskCompletion(item.id)}
                         className="mt-0.5 shrink-0 text-slate-400 hover:text-teal-700 transition"
                         aria-label={isCompleted ? 'Desmarcar tarefa' : 'Concluir tarefa'}
                       >
@@ -287,18 +286,15 @@ export default function Dashboard() {
                             isCompleted ? 'line-through text-slate-400' : 'text-slate-800'
                           }`}
                         >
-                          {task.title}
+                          {item.title}
                         </p>
 
                         <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[11px]">
-                          {/* Recurrence */}
-                          <span
-                            className={`px-2 py-0.5 rounded-md border font-medium ${getRecurrenceBadge(
-                              task.recurrence,
-                            )}`}
-                          >
-                            {task.recurrence}
-                          </span>
+                          {item.type !== 'tarefa' && (
+                            <span className="px-2 py-0.5 rounded-md border font-medium bg-slate-50 text-slate-600 border-slate-200 uppercase text-[10px]">
+                              {item.type}
+                            </span>
+                          )}
 
                           {/* Overdue alert */}
                           {isOverdue && (
@@ -322,15 +318,23 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div className="pt-4 mt-auto border-t border-slate-100">
+          <div className="pt-4 mt-auto border-t border-slate-100 flex gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => navigate('/agenda')}
+              className="flex-1 text-xs font-semibold bg-teal-700 hover:bg-teal-800 text-white"
+            >
+              Abrir Agenda Completa
+              <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+            </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate(`/tarefas?funcao=${userRoleId}`)}
-              className="w-full text-xs font-semibold text-slate-700 hover:text-teal-800"
+              className="text-xs font-semibold text-slate-700 hover:text-teal-800"
             >
-              Ver todas as tarefas desta função
-              <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+              Modelos
             </Button>
           </div>
         </div>

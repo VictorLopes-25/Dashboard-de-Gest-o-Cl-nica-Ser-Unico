@@ -8,6 +8,7 @@ import { AppProvider } from '@/context/AppContext'
 import Login from './pages/Login'
 import Index from './pages/Index'
 import Dashboard from './pages/Dashboard'
+import Agenda from './pages/Agenda'
 import Tarefas from './pages/Tarefas'
 import Leads from './pages/Leads'
 import LeadDetail from './pages/LeadDetail'
@@ -30,6 +31,7 @@ const App = () => (
             {/* Rotas autenticadas (o AppContext exige sessão válida) */}
             <Route path="/" element={<Index />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/agenda" element={<Agenda />} />
             <Route path="/tarefas" element={<Tarefas />} />
             <Route path="/crm" element={<Leads />} />
             <Route path="/crm/leads/:id" element={<LeadDetail />} />
