@@ -15,7 +15,305 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      collaborators: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          role_ids: string[]
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          role_ids?: string[]
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          role_ids?: string[]
+        }
+        Relationships: []
+      }
+      contact_history: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          lead_id: string
+          registered_by: string | null
+          script_title_used: string | null
+          summary: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          lead_id: string
+          registered_by?: string | null
+          script_title_used?: string | null
+          summary: string
+          type?: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          lead_id?: string
+          registered_by?: string | null
+          script_title_used?: string | null
+          summary?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dentists: {
+        Row: {
+          created_at: string
+          cro: string | null
+          id: string
+          is_active: boolean
+          name: string
+          phone: string | null
+          specialties: string[]
+        }
+        Insert: {
+          created_at?: string
+          cro?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          phone?: string | null
+          specialties?: string[]
+        }
+        Update: {
+          created_at?: string
+          cro?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          phone?: string | null
+          specialties?: string[]
+        }
+        Relationships: []
+      }
+      leads: {
+        Row: {
+          assigned_to_id: string | null
+          assigned_to_name: string | null
+          assigned_to_role: string | null
+          created_at: string
+          follow_up_date: string | null
+          id: string
+          interest: string
+          loss_notes: string | null
+          loss_reason: string | null
+          name: string
+          next_action: string | null
+          notes: string | null
+          origin: string
+          phone: string
+          stage: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to_id?: string | null
+          assigned_to_name?: string | null
+          assigned_to_role?: string | null
+          created_at?: string
+          follow_up_date?: string | null
+          id?: string
+          interest?: string
+          loss_notes?: string | null
+          loss_reason?: string | null
+          name: string
+          next_action?: string | null
+          notes?: string | null
+          origin?: string
+          phone: string
+          stage?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to_id?: string | null
+          assigned_to_name?: string | null
+          assigned_to_role?: string | null
+          created_at?: string
+          follow_up_date?: string | null
+          id?: string
+          interest?: string
+          loss_notes?: string | null
+          loss_reason?: string | null
+          name?: string
+          next_action?: string | null
+          notes?: string | null
+          origin?: string
+          phone?: string
+          stage?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          is_admin: boolean
+          name: string
+          role_ids: string[]
+        }
+        Insert: {
+          created_at?: string
+          email?: string
+          id: string
+          is_admin?: boolean
+          name?: string
+          role_ids?: string[]
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          is_admin?: boolean
+          name?: string
+          role_ids?: string[]
+        }
+        Relationships: []
+      }
+      roles: {
+        Row: {
+          bg_light: string
+          border_color: string
+          color: string
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean
+          name: string
+          sort_order: number
+          text_color: string
+        }
+        Insert: {
+          bg_light?: string
+          border_color?: string
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          sort_order?: number
+          text_color?: string
+        }
+        Update: {
+          bg_light?: string
+          border_color?: string
+          color?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          sort_order?: number
+          text_color?: string
+        }
+        Relationships: []
+      }
+      scripts: {
+        Row: {
+          content: string
+          id: string
+          stage: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content: string
+          id?: string
+          stage?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          id?: string
+          stage?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          assigned_collaborator_id: string | null
+          completed_at: string | null
+          created_at: string
+          due_date: string
+          id: string
+          recurrence: string
+          role_id: string
+          status: string
+          title: string
+        }
+        Insert: {
+          assigned_collaborator_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string
+          id?: string
+          recurrence?: string
+          role_id: string
+          status?: string
+          title: string
+        }
+        Update: {
+          assigned_collaborator_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string
+          id?: string
+          recurrence?: string
+          role_id?: string
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assigned_collaborator_id_fkey"
+            columns: ["assigned_collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
