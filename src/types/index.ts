@@ -3,9 +3,12 @@
 // ------------------------------------------------------------------
 
 export interface AuthUser {
-  id: string
+  id?: string
   name: string
-  email: string
+  email?: string
+  roleId: string
+  roleName: string
+  roleColor?: string
 }
 
 export interface Role {
@@ -17,6 +20,7 @@ export interface Role {
   borderColor?: string
   description?: string
   sortOrder?: number
+  isDefault?: boolean
 }
 
 export interface Task {
@@ -39,10 +43,13 @@ export interface Lead {
   interest: string
   stage: LeadStage
   assignedToId?: string | null
-  nextAction?: string | null
-  followUpDate?: string | null
+  assignedToName?: string | null
+  assignedToRole?: string | null
+  nextAction: string
+  followUpDate: string
   lossReason?: LossReason | null
   lossNotes?: string | null
+  notes?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -60,7 +67,7 @@ export interface Collaborator {
   name: string
   email?: string
   phone?: string
-  roleId: string
+  roleIds: string[]
   isActive: boolean
 }
 
@@ -69,9 +76,9 @@ export interface Dentist {
   name: string
   cro?: string
   phone?: string
-  specialties: string[]
+  specialties: DentalSpecialty[]
   isActive: boolean
-  createdAt: string
+  createdAt?: string
 }
 
 export interface ContactHistoryItem {
@@ -80,6 +87,7 @@ export interface ContactHistoryItem {
   type: string
   date: string
   summary: string
+  scriptTitleUsed?: string
   registeredBy: string
 }
 
@@ -87,11 +95,55 @@ export type TaskStatus = 'Pendente' | 'Em andamento' | 'Concluída'
 
 export type TaskRecurrence = 'Única' | 'Diária' | 'Semanal' | 'Mensal'
 
-export type LeadStage = 'Novo' | 'Em negociação' | 'Fechado' | 'Perdido'
+export type LeadStage =
+  | 'Novo'
+  | 'Em Contato'
+  | 'Avaliação'
+  | 'Proposta'
+  | 'Fechado'
+  | 'Perdido'
+  | 'Em negociação'
+
+export type LeadOrigin =
+  | 'Instagram'
+  | 'Google'
+  | 'Indicação'
+  | 'WhatsApp'
+  | 'Site'
+  | 'Facebook'
+  | 'Panfleto'
+  | 'Outro'
+
+export type LeadInterest =
+  | 'Implantes'
+  | 'Aparelho'
+  | 'Lentes de contato'
+  | 'Clareamento'
+  | 'Prótese'
+  | 'Canal'
+  | 'Odontopediatria'
+  | 'Outro'
 
 export type LossReason =
   | 'Preço'
   | 'Não tem interesse'
   | 'Sem resposta'
   | 'Escolheu concorrência'
+  | 'Não respondeu'
+  | 'Escolheu outro profissional'
+  | 'Prazo'
+  | 'Outro'
+
+export type ContactType = 'WhatsApp' | 'Ligação' | 'E-mail' | 'Presencial'
+
+export type DentalSpecialty =
+  | 'Implantodontia'
+  | 'Ortodontia'
+  | 'Endodontia'
+  | 'Dentística'
+  | 'Periodontia'
+  | 'Prótese'
+  | 'Odontopediatria'
+  | 'Cirurgia'
+  | 'Clareamento'
   | 'Outro'

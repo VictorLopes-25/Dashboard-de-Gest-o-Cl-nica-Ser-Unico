@@ -157,7 +157,7 @@ export default function Leads() {
   }
 
   // Helper for origin badge styles
-  const getOriginBadgeStyle = (origin: LeadOrigin) => {
+  const getOriginBadgeStyle = (origin: string) => {
     switch (origin) {
       case 'Instagram':
         return 'bg-pink-50 text-pink-700 border-pink-200'

@@ -1,32 +1,223 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import type { Role, Task, Lead, Script, Collaborator, Dentist, ContactHistoryItem } from '@/types'
+import {
+  INITIAL_ROLES,
+  INITIAL_COLLABORATORS,
+  INITIAL_DENTISTS,
+  INITIAL_TASKS,
+  INITIAL_LEADS,
+  INITIAL_SCRIPTS,
+  INITIAL_CONTACT_HISTORY,
+  getTodayDateString,
+} from '@/data/mockData'
+import type {
+  AuthUser,
+  Role,
+  Task,
+  Lead,
+  Script,
+  Collaborator,
+  Dentist,
+  ContactHistoryItem,
+  LeadStage,
+  LossReason,
+  TaskStatus,
+  TaskRecurrence,
+  DentalSpecialty,
+} from '@/types'
 
-/*
- * AppContext — camada de dados e sessão do sistema.
- *
- * Persistência real no Supabase (Postgres). Todas as entidades são carregadas
- * das tabelas do banco e as mutações (create/update/delete) são gravadas
- * diretamente no Supabase. A sessão do usuário vem do AuthContext.
- */
+export type { AuthUser }
 
 // ------------------------------------------------------------------
-// Tipos
+// Mappers: DB row (snake_case) <-> Frontend types (camelCase)
 // ------------------------------------------------------------------
 
-export interface AuthUser {
-  id: string
-  name: string
-  email: string
+function mapDbRole(r: any): Role {
+  return {
+    id: r.id,
+    name: r.name,
+    color: r.color || '#0F766E',
+    bgLight: r.bg_light || '#CCFBF1',
+    textColor: r.text_color || '#0F766E',
+    borderColor: r.border_color || '#5EEAD4',
+    description: r.description || '',
+    sortOrder: r.sort_order ?? 0,
+  }
+}
+
+function roleToDb(r: Partial<Role>): any {
+  const out: any = {}
+  if (r.name !== undefined) out.name = r.name
+  if (r.color !== undefined) out.color = r.color
+  if (r.bgLight !== undefined) out.bg_light = r.bgLight
+  if (r.textColor !== undefined) out.text_color = r.textColor
+  if (r.borderColor !== undefined) out.border_color = r.borderColor
+  if (r.description !== undefined) out.description = r.description
+  if (r.sortOrder !== undefined) out.sort_order = r.sortOrder
+  return out
+}
+
+function mapDbCollaborator(c: any): Collaborator {
+  return {
+    id: c.id,
+    name: c.name,
+    phone: c.phone || '',
+    email: c.email || '',
+    roleIds: Array.isArray(c.role_ids) ? c.role_ids : [],
+    isActive: c.is_active ?? true,
+  }
+}
+
+function collaboratorToDb(c: Partial<Collaborator>): any {
+  const out: any = {}
+  if (c.name !== undefined) out.name = c.name
+  if (c.phone !== undefined) out.phone = c.phone
+  if (c.email !== undefined) out.email = c.email
+  if (c.roleIds !== undefined) out.role_ids = c.roleIds
+  if (c.isActive !== undefined) out.is_active = c.isActive
+  return out
+}
+
+function mapDbDentist(d: any): Dentist {
+  return {
+    id: d.id,
+    name: d.name,
+    cro: d.cro || '',
+    phone: d.phone || '',
+    specialties: (Array.isArray(d.specialties) ? d.specialties : []) as DentalSpecialty[],
+    isActive: d.is_active ?? true,
+    createdAt: d.created_at,
+  }
+}
+
+function dentistToDb(d: Partial<Dentist>): any {
+  const out: any = {}
+  if (d.name !== undefined) out.name = d.name
+  if (d.cro !== undefined) out.cro = d.cro
+  if (d.phone !== undefined) out.phone = d.phone
+  if (d.specialties !== undefined) out.specialties = d.specialties
+  if (d.isActive !== undefined) out.is_active = d.isActive
+  return out
+}
+
+function mapDbTask(t: any): Task {
+  return {
+    id: t.id,
+    title: t.title,
+    roleId: t.role_id,
+    status: t.status as TaskStatus,
+    recurrence: t.recurrence as TaskRecurrence,
+    assignedCollaboratorId: t.assigned_collaborator_id || null,
+    dueDate: t.due_date || getTodayDateString(0),
+    completedAt: t.completed_at || null,
+    createdAt: t.created_at,
+  }
+}
+
+function taskToDb(t: Partial<Task>): any {
+  const out: any = {}
+  if (t.title !== undefined) out.title = t.title
+  if (t.roleId !== undefined) out.role_id = t.roleId
+  if (t.status !== undefined) out.status = t.status
+  if (t.recurrence !== undefined) out.recurrence = t.recurrence
+  if (t.assignedCollaboratorId !== undefined)
+    out.assigned_collaborator_id = t.assignedCollaboratorId
+  if (t.dueDate !== undefined) out.due_date = t.dueDate
+  if (t.completedAt !== undefined) out.completed_at = t.completedAt
+  return out
+}
+
+function mapDbLead(l: any): Lead {
+  return {
+    id: l.id,
+    name: l.name,
+    phone: l.phone || '',
+    origin: l.origin || 'Outro',
+    interest: l.interest || 'Outro',
+    stage: l.stage as LeadStage,
+    assignedToId: l.assigned_to_id || null,
+    assignedToName: l.assigned_to_name || null,
+    assignedToRole: l.assigned_to_role || null,
+    nextAction: l.next_action || '',
+    followUpDate: l.follow_up_date || getTodayDateString(0),
+    lossReason: l.loss_reason as LossReason | null,
+    lossNotes: l.loss_notes || null,
+    notes: l.notes || null,
+    createdAt: l.created_at,
+    updatedAt: l.updated_at,
+  }
+}
+
+function leadToDb(l: Partial<Lead>): any {
+  const out: any = {}
+  if (l.name !== undefined) out.name = l.name
+  if (l.phone !== undefined) out.phone = l.phone
+  if (l.origin !== undefined) out.origin = l.origin
+  if (l.interest !== undefined) out.interest = l.interest
+  if (l.stage !== undefined) out.stage = l.stage
+  if (l.assignedToId !== undefined) out.assigned_to_id = l.assignedToId
+  if (l.assignedToName !== undefined) out.assigned_to_name = l.assignedToName
+  if (l.assignedToRole !== undefined) out.assigned_to_role = l.assignedToRole
+  if (l.nextAction !== undefined) out.next_action = l.nextAction
+  if (l.followUpDate !== undefined) out.follow_up_date = l.followUpDate
+  if (l.lossReason !== undefined) out.loss_reason = l.lossReason
+  if (l.lossNotes !== undefined) out.loss_notes = l.lossNotes
+  if (l.notes !== undefined) out.notes = l.notes
+  return out
+}
+
+function mapDbScript(s: any): Script {
+  return {
+    id: s.id,
+    title: s.title,
+    stage: s.stage as LeadStage,
+    content: s.content || '',
+    updatedAt: s.updated_at || '',
+  }
+}
+
+function scriptToDb(s: Partial<Script>): any {
+  const out: any = {}
+  if (s.title !== undefined) out.title = s.title
+  if (s.stage !== undefined) out.stage = s.stage
+  if (s.content !== undefined) out.content = s.content
+  return out
+}
+
+function mapDbContactHistory(h: any): ContactHistoryItem {
+  return {
+    id: h.id,
+    leadId: h.lead_id,
+    type: h.type || 'WhatsApp',
+    date: h.date || '',
+    summary: h.summary || '',
+    scriptTitleUsed: h.script_title_used || undefined,
+    registeredBy: h.registered_by || 'CRC Ser Único',
+  }
+}
+
+function contactHistoryToDb(h: Partial<ContactHistoryItem>): any {
+  const out: any = {}
+  if (h.leadId !== undefined) out.lead_id = h.leadId
+  if (h.type !== undefined) out.type = h.type
+  if (h.date !== undefined) out.date = h.date
+  if (h.summary !== undefined) out.summary = h.summary
+  if (h.scriptTitleUsed !== undefined) out.script_title_used = h.scriptTitleUsed
+  if (h.registeredBy !== undefined) out.registered_by = h.registeredBy
+  return out
 }
 
 // ------------------------------------------------------------------
-// Context
+// Context interface (com compatibilidade para currentUser, toggleTaskCompletion, etc.)
 // ------------------------------------------------------------------
 
 interface AppContextType {
-  // Sessão
+  // Sessão / Usuário ativo
   session: AuthUser | null
+  currentUser: AuthUser | null
+  setCurrentUser: (user: AuthUser | null) => void
+  logout: () => void
+  isManagerOrAdmin: boolean
   loading: boolean
 
   // Dados
@@ -38,32 +229,50 @@ interface AppContextType {
   scripts: Script[]
   contactHistory: ContactHistoryItem[]
 
-  // CRUD
+  // Helper getters
+  getLeadById: (id: string) => Lead | undefined
+  getHistoryForLead: (leadId: string) => ContactHistoryItem[]
+
+  // CRUD Roles
   addRole: (role: Omit<Role, 'id'>) => Promise<Role | null>
   updateRole: (id: string, updates: Partial<Role>) => Promise<void>
   deleteRole: (id: string) => Promise<void>
 
+  // CRUD Colaboradores
   addCollaborator: (colab: Omit<Collaborator, 'id'>) => Promise<Collaborator | null>
   updateCollaborator: (id: string, updates: Partial<Collaborator>) => Promise<void>
   deleteCollaborator: (id: string) => Promise<void>
 
+  // CRUD Dentistas
   addDentist: (dentist: Omit<Dentist, 'id'>) => Promise<Dentist | null>
   updateDentist: (id: string, updates: Partial<Dentist>) => Promise<void>
   deleteDentist: (id: string) => Promise<void>
 
+  // CRUD Tarefas
   addTask: (task: Omit<Task, 'id' | 'createdAt'>) => Promise<Task | null>
   updateTask: (id: string, updates: Partial<Task>) => Promise<void>
   deleteTask: (id: string) => Promise<void>
+  toggleTaskCompletion: (id: string) => Promise<void>
 
+  // CRUD Leads
   addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Lead | null>
   updateLead: (id: string, updates: Partial<Lead>) => Promise<void>
   deleteLead: (id: string) => Promise<void>
+  moveLeadStage: (
+    leadId: string,
+    targetStage: LeadStage,
+    extra?: { lossReason?: LossReason; lossNotes?: string },
+  ) => Promise<void>
 
+  // CRUD Scripts & Histórico
   addScript: (script: Omit<Script, 'id' | 'updatedAt'>) => Promise<Script | null>
   updateScript: (id: string, updates: Partial<Script>) => Promise<void>
   deleteScript: (id: string) => Promise<void>
+  addContactHistory: (item: Omit<ContactHistoryItem, 'id'>) => Promise<void>
 
+  // Reset / Refresh
   refreshData: () => Promise<void>
+  resetData: () => Promise<void>
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
@@ -72,68 +281,162 @@ const AppContext = createContext<AppContextType | undefined>(undefined)
 // Provider
 // ------------------------------------------------------------------
 
+const DEFAULT_CURRENT_USER: AuthUser = {
+  id: 'user-crc-default',
+  name: 'Paula Rocha',
+  roleId: '11111111-1111-4111-8111-111111111104',
+  roleName: 'CRC',
+  roleColor: '#7C3AED',
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<AuthUser | null>(null)
+  const [currentUser, setCurrentUserState] = useState<AuthUser | null>(() => {
+    try {
+      const stored = localStorage.getItem('ser_unico_current_user')
+      if (stored) return JSON.parse(stored)
+    } catch {
+      // fallback
+    }
+    return DEFAULT_CURRENT_USER
+  })
+
   const [loading, setLoading] = useState(true)
 
-  const [roles, setRoles] = useState<Role[]>([])
-  const [collaborators, setCollaborators] = useState<Collaborator[]>([])
-  const [dentists, setDentists] = useState<Dentist[]>([])
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [leads, setLeads] = useState<Lead[]>([])
-  const [scripts, setScripts] = useState<Script[]>([])
-  const [contactHistory, setContactHistory] = useState<ContactHistoryItem[]>([])
+  const [roles, setRoles] = useState<Role[]>(INITIAL_ROLES)
+  const [collaborators, setCollaborators] = useState<Collaborator[]>(INITIAL_COLLABORATORS)
+  const [dentists, setDentists] = useState<Dentist[]>(INITIAL_DENTISTS)
+  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS)
+  const [leads, setLeads] = useState<Lead[]>(INITIAL_LEADS)
+  const [scripts, setScripts] = useState<Script[]>(INITIAL_SCRIPTS)
+  const [contactHistory, setContactHistory] =
+    useState<ContactHistoryItem[]>(INITIAL_CONTACT_HISTORY)
+
+  const setCurrentUser = useCallback((user: AuthUser | null) => {
+    setCurrentUserState(user)
+    try {
+      if (user) {
+        localStorage.setItem('ser_unico_current_user', JSON.stringify(user))
+      } else {
+        localStorage.removeItem('ser_unico_current_user')
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const logout = useCallback(() => {
+    setCurrentUser(null)
+  }, [setCurrentUser])
+
+  const isManagerOrAdmin = useMemo(() => {
+    if (!currentUser) return false
+    const name = currentUser.roleName.toLowerCase()
+    return name.includes('gerência') || name.includes('administrativo') || name.includes('admin')
+  }, [currentUser])
 
   // ----------------------------------------------------------------
-  // Carregamento inicial dos dados
+  // Carregamento inicial dos dados com fallback elegante
   // ----------------------------------------------------------------
 
   const refreshData = useCallback(async () => {
-    const [rolesRes, colabsRes, dentistsRes, tasksRes, leadsRes, scriptsRes] = await Promise.all([
-      supabase.from('roles').select('*').order('sort_order'),
-      supabase.from('collaborators').select('*').order('name'),
-      supabase.from('dentists').select('*').order('name'),
-      supabase.from('tasks').select('*').order('created_at', { ascending: false }),
-      supabase.from('leads').select('*').order('created_at', { ascending: false }),
-      supabase.from('scripts').select('*').order('title'),
-    ])
+    try {
+      const [rolesRes, colabsRes, dentistsRes, tasksRes, leadsRes, scriptsRes, historyRes] =
+        await Promise.all([
+          supabase.from('roles').select('*').order('sort_order'),
+          supabase.from('collaborators').select('*').order('name'),
+          supabase.from('dentists').select('*').order('name'),
+          supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+          supabase.from('leads').select('*').order('created_at', { ascending: false }),
+          supabase.from('scripts').select('*').order('title'),
+          supabase.from('contact_history').select('*').order('date', { ascending: false }),
+        ])
 
-    if (rolesRes.data) setRoles(rolesRes.data)
-    if (colabsRes.data) setCollaborators(colabsRes.data)
-    if (dentistsRes.data) setDentists(dentistsRes.data)
-    if (tasksRes.data) setTasks(tasksRes.data)
-    if (leadsRes.data) setLeads(leadsRes.data)
-    if (scriptsRes.data) setScripts(scriptsRes.data)
+      if (rolesRes.data && rolesRes.data.length > 0) {
+        setRoles(rolesRes.data.map(mapDbRole))
+      }
+      if (colabsRes.data && colabsRes.data.length > 0) {
+        setCollaborators(colabsRes.data.map(mapDbCollaborator))
+      }
+      if (dentistsRes.data && dentistsRes.data.length > 0) {
+        setDentists(dentistsRes.data.map(mapDbDentist))
+      }
+      if (tasksRes.data && tasksRes.data.length > 0) {
+        setTasks(tasksRes.data.map(mapDbTask))
+      }
+      if (leadsRes.data && leadsRes.data.length > 0) {
+        setLeads(leadsRes.data.map(mapDbLead))
+      }
+      if (scriptsRes.data && scriptsRes.data.length > 0) {
+        setScripts(scriptsRes.data.map(mapDbScript))
+      }
+      if (historyRes.data && historyRes.data.length > 0) {
+        setContactHistory(historyRes.data.map(mapDbContactHistory))
+      }
+    } catch {
+      // Fallback permanece com os dados iniciais
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
     refreshData()
   }, [refreshData])
 
+  // Helpers
+  const getLeadById = useCallback(
+    (id: string): Lead | undefined => {
+      return leads.find((l) => l.id === id)
+    },
+    [leads],
+  )
+
+  const getHistoryForLead = useCallback(
+    (leadId: string): ContactHistoryItem[] => {
+      return contactHistory.filter((h) => h.leadId === leadId)
+    },
+    [contactHistory],
+  )
+
   // ----------------------------------------------------------------
   // CRUD — Funções (roles)
   // ----------------------------------------------------------------
 
   const addRole = async (roleData: Omit<Role, 'id'>): Promise<Role | null> => {
-    const { data, error } = await supabase.from('roles').insert(roleData).select().single()
-
-    if (error || !data) return null
-
-    setRoles((prev) => [...prev, data])
-    return data
+    try {
+      const payload = roleToDb(roleData)
+      const { data, error } = await supabase.from('roles').insert(payload).select().single()
+      if (!error && data) {
+        const created = mapDbRole(data)
+        setRoles((prev) => [...prev, created])
+        return created
+      }
+    } catch {
+      // fallback local
+    }
+    const localRole: Role = {
+      ...roleData,
+      id: `role-local-${Date.now()}`,
+    }
+    setRoles((prev) => [...prev, localRole])
+    return localRole
   }
 
   const updateRole = async (id: string, updates: Partial<Role>) => {
-    const { error } = await supabase.from('roles').update(updates).eq('id', id)
-    if (!error) {
-      setRoles((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)))
+    setRoles((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)))
+    try {
+      await supabase.from('roles').update(roleToDb(updates)).eq('id', id)
+    } catch {
+      // ignore
     }
   }
 
   const deleteRole = async (id: string) => {
-    const { error } = await supabase.from('roles').delete().eq('id', id)
-    if (!error) {
-      setRoles((prev) => prev.filter((r) => r.id !== id))
+    setRoles((prev) => prev.filter((r) => r.id !== id))
+    try {
+      await supabase.from('roles').delete().eq('id', id)
+    } catch {
+      // ignore
     }
   }
 
@@ -144,25 +447,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addCollaborator = async (
     colabData: Omit<Collaborator, 'id'>,
   ): Promise<Collaborator | null> => {
-    const { data, error } = await supabase.from('collaborators').insert(colabData).select().single()
-
-    if (error || !data) return null
-
-    setCollaborators((prev) => [...prev, data])
-    return data
+    try {
+      const payload = collaboratorToDb(colabData)
+      const { data, error } = await supabase.from('collaborators').insert(payload).select().single()
+      if (!error && data) {
+        const created = mapDbCollaborator(data)
+        setCollaborators((prev) => [...prev, created])
+        return created
+      }
+    } catch {
+      // fallback local
+    }
+    const localColab: Collaborator = {
+      ...colabData,
+      id: `colab-local-${Date.now()}`,
+    }
+    setCollaborators((prev) => [...prev, localColab])
+    return localColab
   }
 
   const updateCollaborator = async (id: string, updates: Partial<Collaborator>) => {
-    const { error } = await supabase.from('collaborators').update(updates).eq('id', id)
-    if (!error) {
-      setCollaborators((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)))
+    setCollaborators((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)))
+    try {
+      await supabase.from('collaborators').update(collaboratorToDb(updates)).eq('id', id)
+    } catch {
+      // ignore
     }
   }
 
   const deleteCollaborator = async (id: string) => {
-    const { error } = await supabase.from('collaborators').delete().eq('id', id)
-    if (!error) {
-      setCollaborators((prev) => prev.filter((c) => c.id !== id))
+    setCollaborators((prev) => prev.filter((c) => c.id !== id))
+    try {
+      await supabase.from('collaborators').delete().eq('id', id)
+    } catch {
+      // ignore
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // CRUD — Dentistas
+  // ----------------------------------------------------------------
+
+  const addDentist = async (dentistData: Omit<Dentist, 'id'>): Promise<Dentist | null> => {
+    try {
+      const payload = dentistToDb(dentistData)
+      const { data, error } = await supabase.from('dentists').insert(payload).select().single()
+      if (!error && data) {
+        const created = mapDbDentist(data)
+        setDentists((prev) => [...prev, created])
+        return created
+      }
+    } catch {
+      // fallback local
+    }
+    const localDentist: Dentist = {
+      ...dentistData,
+      id: `dentist-local-${Date.now()}`,
+    }
+    setDentists((prev) => [...prev, localDentist])
+    return localDentist
+  }
+
+  const updateDentist = async (id: string, updates: Partial<Dentist>) => {
+    setDentists((prev) => prev.map((d) => (d.id === id ? { ...d, ...updates } : d)))
+    try {
+      await supabase.from('dentists').update(dentistToDb(updates)).eq('id', id)
+    } catch {
+      // ignore
+    }
+  }
+
+  const deleteDentist = async (id: string) => {
+    setDentists((prev) => prev.filter((d) => d.id !== id))
+    try {
+      await supabase.from('dentists').delete().eq('id', id)
+    } catch {
+      // ignore
     }
   }
 
@@ -171,26 +531,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ----------------------------------------------------------------
 
   const addTask = async (taskData: Omit<Task, 'id' | 'createdAt'>): Promise<Task | null> => {
-    const { data, error } = await supabase.from('tasks').insert(taskData).select().single()
-
-    if (error || !data) return null
-
-    setTasks((prev) => [data, ...prev])
-    return data
+    try {
+      const payload = taskToDb(taskData)
+      const { data, error } = await supabase.from('tasks').insert(payload).select().single()
+      if (!error && data) {
+        const created = mapDbTask(data)
+        setTasks((prev) => [created, ...prev])
+        return created
+      }
+    } catch {
+      // fallback local
+    }
+    const localTask: Task = {
+      ...taskData,
+      id: `task-local-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+    }
+    setTasks((prev) => [localTask, ...prev])
+    return localTask
   }
 
   const updateTask = async (id: string, updates: Partial<Task>) => {
-    const { error } = await supabase.from('tasks').update(updates).eq('id', id)
-    if (!error) {
-      setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)))
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)))
+    try {
+      await supabase.from('tasks').update(taskToDb(updates)).eq('id', id)
+    } catch {
+      // ignore
     }
   }
 
   const deleteTask = async (id: string) => {
-    const { error } = await supabase.from('tasks').delete().eq('id', id)
-    if (!error) {
-      setTasks((prev) => prev.filter((t) => t.id !== id))
+    setTasks((prev) => prev.filter((t) => t.id !== id))
+    try {
+      await supabase.from('tasks').delete().eq('id', id)
+    } catch {
+      // ignore
     }
+  }
+
+  const toggleTaskCompletion = async (id: string) => {
+    const task = tasks.find((t) => t.id === id)
+    if (!task) return
+    const isNowCompleted = task.status !== 'Concluída'
+    const newStatus: TaskStatus = isNowCompleted ? 'Concluída' : 'Pendente'
+    const completedAt = isNowCompleted ? new Date().toISOString() : null
+    await updateTask(id, { status: newStatus, completedAt })
   }
 
   // ----------------------------------------------------------------
@@ -200,26 +585,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addLead = async (
     leadData: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>,
   ): Promise<Lead | null> => {
-    const { data, error } = await supabase.from('leads').insert(leadData).select().single()
-
-    if (error || !data) return null
-
-    setLeads((prev) => [data, ...prev])
-    return data
+    try {
+      const payload = leadToDb(leadData)
+      const { data, error } = await supabase.from('leads').insert(payload).select().single()
+      if (!error && data) {
+        const created = mapDbLead(data)
+        setLeads((prev) => [created, ...prev])
+        return created
+      }
+    } catch {
+      // fallback local
+    }
+    const now = new Date().toISOString()
+    const localLead: Lead = {
+      ...leadData,
+      id: `lead-local-${Date.now()}`,
+      createdAt: now,
+      updatedAt: now,
+    }
+    setLeads((prev) => [localLead, ...prev])
+    return localLead
   }
 
   const updateLead = async (id: string, updates: Partial<Lead>) => {
-    const { error } = await supabase.from('leads').update(updates).eq('id', id)
-    if (!error) {
-      setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updates } : l)))
+    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...updates } : l)))
+    try {
+      await supabase.from('leads').update(leadToDb(updates)).eq('id', id)
+    } catch {
+      // ignore
     }
   }
 
   const deleteLead = async (id: string) => {
-    const { error } = await supabase.from('leads').delete().eq('id', id)
-    if (!error) {
-      setLeads((prev) => prev.filter((l) => l.id !== id))
+    setLeads((prev) => prev.filter((l) => l.id !== id))
+    try {
+      await supabase.from('leads').delete().eq('id', id)
+    } catch {
+      // ignore
     }
+  }
+
+  const moveLeadStage = async (
+    leadId: string,
+    targetStage: LeadStage,
+    extra?: { lossReason?: LossReason; lossNotes?: string },
+  ) => {
+    const updates: Partial<Lead> = {
+      stage: targetStage,
+      lossReason: extra?.lossReason ?? null,
+      lossNotes: extra?.lossNotes ?? null,
+    }
+    await updateLead(leadId, updates)
   }
 
   // ----------------------------------------------------------------
@@ -229,40 +645,76 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addScript = async (
     scriptData: Omit<Script, 'id' | 'updatedAt'>,
   ): Promise<Script | null> => {
-    const { data, error } = await supabase.from('scripts').insert(scriptData).select().single()
-
-    if (error || !data) return null
-
-    setScripts((prev) => [data, ...prev])
-    return data
+    try {
+      const payload = scriptToDb(scriptData)
+      const { data, error } = await supabase.from('scripts').insert(payload).select().single()
+      if (!error && data) {
+        const created = mapDbScript(data)
+        setScripts((prev) => [created, ...prev])
+        return created
+      }
+    } catch {
+      // fallback local
+    }
+    const localScript: Script = {
+      ...scriptData,
+      id: `script-local-${Date.now()}`,
+      updatedAt: new Date().toLocaleDateString('pt-BR'),
+    }
+    setScripts((prev) => [localScript, ...prev])
+    return localScript
   }
 
   const updateScript = async (id: string, updates: Partial<Script>) => {
-    const { error } = await supabase.from('scripts').update(updates).eq('id', id)
-    if (!error) {
-      setScripts((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)))
+    setScripts((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)))
+    try {
+      await supabase.from('scripts').update(scriptToDb(updates)).eq('id', id)
+    } catch {
+      // ignore
     }
   }
 
   const deleteScript = async (id: string) => {
-    const { error } = await supabase.from('scripts').delete().eq('id', id)
-    if (!error) {
-      setScripts((prev) => prev.filter((s) => s.id !== id))
+    setScripts((prev) => prev.filter((s) => s.id !== id))
+    try {
+      await supabase.from('scripts').delete().eq('id', id)
+    } catch {
+      // ignore
     }
   }
 
   const addContactHistory = async (item: Omit<ContactHistoryItem, 'id'>) => {
-    const { error } = await supabase.from('contact_history').insert(item)
-    if (!error) {
-      // Recarrega o histórico do lead
-      await refreshData()
+    const localItem: ContactHistoryItem = {
+      ...item,
+      id: `hist-local-${Date.now()}`,
     }
+    setContactHistory((prev) => [localItem, ...prev])
+    try {
+      await supabase.from('contact_history').insert(contactHistoryToDb(item))
+    } catch {
+      // ignore
+    }
+  }
+
+  // Reset dados locais para dados de demonstração
+  const resetData = async () => {
+    setRoles(INITIAL_ROLES)
+    setCollaborators(INITIAL_COLLABORATORS)
+    setDentists(INITIAL_DENTISTS)
+    setTasks(INITIAL_TASKS)
+    setLeads(INITIAL_LEADS)
+    setScripts(INITIAL_SCRIPTS)
+    setContactHistory(INITIAL_CONTACT_HISTORY)
   }
 
   return (
     <AppContext.Provider
       value={{
-        session,
+        session: currentUser,
+        currentUser,
+        setCurrentUser,
+        logout,
+        isManagerOrAdmin,
         loading,
         roles,
         collaborators,
@@ -271,6 +723,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         leads,
         scripts,
         contactHistory,
+        getLeadById,
+        getHistoryForLead,
         addRole,
         updateRole,
         deleteRole,
@@ -283,13 +737,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addTask,
         updateTask,
         deleteTask,
+        toggleTaskCompletion,
         addLead,
         updateLead,
         deleteLead,
+        moveLeadStage,
         addScript,
         updateScript,
         deleteScript,
+        addContactHistory,
         refreshData,
+        resetData,
       }}
     >
       {children}

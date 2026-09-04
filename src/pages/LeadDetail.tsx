@@ -184,7 +184,7 @@ export default function LeadDetail() {
     })
   }
 
-  const getContactIcon = (type: ContactType) => {
+  const getContactIcon = (type: string) => {
     switch (type) {
       case 'WhatsApp':
         return <MessageCircle className="w-4 h-4 text-emerald-600" />
