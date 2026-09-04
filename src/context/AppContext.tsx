@@ -28,8 +28,6 @@ interface AppContextType {
   // Sessão
   session: AuthUser | null
   loading: boolean
-  login: (email: string, password: string) => Promise<{ error: string | null }>
-  logout: () => Promise<void>
 
   // Dados
   roles: Role[]
@@ -262,7 +260,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }
 
   return (
-    <AppContext.Provider value={{ session, loading, login, logout, refreshData }}>
+    <AppContext.Provider
+      value={{
+        session,
+        loading,
+        roles,
+        collaborators,
+        dentists,
+        tasks,
+        leads,
+        scripts,
+        contactHistory,
+        addRole,
+        updateRole,
+        deleteRole,
+        addCollaborator,
+        updateCollaborator,
+        deleteCollaborator,
+        addDentist,
+        updateDentist,
+        deleteDentist,
+        addTask,
+        updateTask,
+        deleteTask,
+        addLead,
+        updateLead,
+        deleteLead,
+        addScript,
+        updateScript,
+        deleteScript,
+        refreshData,
+      }}
+    >
       {children}
     </AppContext.Provider>
   )
