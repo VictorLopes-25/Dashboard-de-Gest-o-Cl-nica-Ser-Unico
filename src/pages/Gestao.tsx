@@ -27,22 +27,19 @@ import type {
   ManagementAction,
   ManagementItemType,
   ManagementVisibilityLevel,
-  ManagementItemStatus,
   ManagementActionStatus,
   ManagedException,
   OrgThresholdConfig,
-  DerivedPendingItem,
   ExceptionSeverity,
   ExceptionStatus,
 } from '@/types'
+import { getHumanThresholdInfo } from '@/config/thresholdLabels'
 import {
   ShieldAlert,
   Lock,
   Eye,
-  Users,
   Building2,
   Plus,
-  Filter,
   CheckCircle2,
   Clock,
   Calendar,
@@ -58,8 +55,10 @@ import {
   AlertTriangle,
   RotateCcw,
   Check,
-  ChevronRight,
   ListTodo,
+  MessageSquare,
+  ChevronDown,
+  Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -88,38 +87,38 @@ const VISIBILITY_CONFIG: Record<
   { label: string; description: string; badgeClass: string; icon: any }
 > = {
   OWNER_ONLY: {
-    label: 'OWNER Exclusivo',
-    description: 'Decisões de posse, conteúdo estratégico restrito ao OWNER',
+    label: 'Diretoria (OWNER)',
+    description: 'Decisões de posse e diretrizes restritas ao proprietário da clínica',
     badgeClass: 'bg-amber-100 text-amber-900 border-amber-300 font-bold',
     icon: Lock,
   },
   PRIVATE_MANAGEMENT: {
-    label: 'Gestão Privada',
-    description: 'Notas privadas do gestor sobre colaboradores e rotinas',
+    label: 'Anotação Gerencial Privada',
+    description: 'Notas privadas da gerência sobre o acompanhamento da operação',
     badgeClass: 'bg-purple-100 text-purple-900 border-purple-300 font-medium',
     icon: Eye,
   },
   SHARED_WITH_EMPLOYEE: {
     label: 'Compartilhado com Colaborador',
-    description: 'Feedback visível ao colaborador avaliado e à gestão',
+    description: 'Orientação visível ao colaborador avaliado e à gerência',
     badgeClass: 'bg-teal-100 text-teal-900 border-teal-300 font-medium',
     icon: UserCheck,
   },
   FUNCTION_VISIBLE: {
     label: 'Visível para a Função',
-    description: 'Diretrizes e protocolos visíveis para toda a função',
+    description: 'Diretrizes e protocolos operacionais visíveis para toda a função',
     badgeClass: 'bg-blue-100 text-blue-900 border-blue-300 font-medium',
     icon: Building2,
   },
 }
 
-// Labels de tipos de item
+// Labels humanizados de tipos de orientações
 const TYPE_CONFIG: Record<ManagementItemType, { label: string; icon: any }> = {
-  feedback: { label: 'Feedback', icon: UserCheck },
-  nota_privada_gestao: { label: 'Nota Privada', icon: Eye },
-  decisao_posse: { label: 'Decisão de Posse', icon: Lock },
-  conteudo_estrategico: { label: 'Conteúdo Estratégico', icon: Sparkles },
-  instrucao_funcao: { label: 'Instrução de Função', icon: Building2 },
+  feedback: { label: 'Feedback e Alinhamento', icon: UserCheck },
+  nota_privada_gestao: { label: 'Anotação Interna', icon: Eye },
+  decisao_posse: { label: 'Decisão Organizacional', icon: Lock },
+  conteudo_estrategico: { label: 'Planejamento Estratégico', icon: Sparkles },
+  instrucao_funcao: { label: 'Instrução para a Função', icon: Building2 },
   reconhecimento: { label: 'Reconhecimento', icon: CheckCircle2 },
   plano_desenvolvimento: { label: 'Plano de Desenvolvimento', icon: TrendingUp },
 }
@@ -139,39 +138,39 @@ const ACTION_STATUS_CONFIG: Record<ManagementActionStatus, { label: string; badg
     cancelada: { label: 'Cancelada', badgeClass: 'bg-red-100 text-red-700 border-red-300' },
   }
 
-// Labels de severidade de exceção
+// Labels de severidade humanizados
 const SEVERITY_CONFIG: Record<ExceptionSeverity, { label: string; badgeClass: string; icon: any }> =
   {
     baixa: {
-      label: 'Baixa',
+      label: 'Atenção Leve',
       badgeClass: 'bg-slate-100 text-slate-700 border-slate-300',
       icon: Clock,
     },
     media: {
-      label: 'Média',
+      label: 'Atenção Média',
       badgeClass: 'bg-amber-100 text-amber-800 border-amber-300 font-medium',
       icon: AlertTriangle,
     },
     alta: {
-      label: 'Alta',
+      label: 'Prioridade Alta',
       badgeClass: 'bg-orange-100 text-orange-800 border-orange-300 font-bold',
       icon: AlertCircle,
     },
     critica: {
-      label: 'Crítica',
+      label: 'Urgente / Crítico',
       badgeClass: 'bg-red-100 text-red-800 border-red-300 font-extrabold',
       icon: ShieldAlert,
     },
   }
 
-// Labels de status de exceção
+// Labels de status de situação humanizados
 const EXCEPTION_STATUS_CONFIG: Record<ExceptionStatus, { label: string; badgeClass: string }> = {
   aberta: {
-    label: 'Aberta',
+    label: 'Aguardando Decisão',
     badgeClass: 'bg-red-50 text-red-700 border-red-200 font-semibold',
   },
   reconhecida: {
-    label: 'Reconhecida',
+    label: 'Ciente pela Gerência',
     badgeClass: 'bg-amber-50 text-amber-700 border-amber-200 font-medium',
   },
   decidida: {
@@ -185,19 +184,22 @@ const EXCEPTION_STATUS_CONFIG: Record<ExceptionStatus, { label: string; badgeCla
 }
 
 export default function Gestao() {
-  const { currentUser, isOwner, roles, collaborators, agendaItems, leads, tasks } = useApp()
+  const { isOwner, roles, collaborators, agendaItems, leads, tasks } = useApp()
   const { toast } = useToast()
 
+  // Seções da tela operacional
+  // Primary tabs: 'attention' | 'pending' | 'actions' | 'feedback' | 'rules'
   const [activeTab, setActiveTab] = useState<
-    'exceptions' | 'pending_day' | 'items' | 'actions' | 'thresholds'
-  >('exceptions')
+    'attention' | 'pending' | 'actions' | 'feedback' | 'rules'
+  >('attention')
+
   const [items, setItems] = useState<ManagementItem[]>([])
   const [actions, setActions] = useState<ManagementAction[]>([])
   const [exceptions, setExceptions] = useState<ManagedException[]>([])
   const [thresholds, setThresholds] = useState<OrgThresholdConfig[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Filtros gerais
+  // Filtros
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<string>('all')
   const [filterVisibility, setFilterVisibility] = useState<string>('all')
@@ -216,7 +218,7 @@ export default function Gestao() {
   const [resolveImmediately, setResolveImmediately] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
-  // Estado do formulário de Item de Gestão
+  // Formulário: Item de Gestão
   const [itemTitle, setItemTitle] = useState('')
   const [itemContent, setItemContent] = useState('')
   const [itemType, setItemType] = useState<ManagementItemType>('feedback')
@@ -225,7 +227,7 @@ export default function Gestao() {
   const [itemTargetPersonId, setItemTargetPersonId] = useState<string>('')
   const [itemTargetFunctionId, setItemTargetFunctionId] = useState<string>('')
 
-  // Estado do formulário de Ação de Gestão
+  // Formulário: Ação de Gestão
   const [actionTitle, setActionTitle] = useState('')
   const [actionDescription, setActionDescription] = useState('')
   const [actionRespPersonId, setActionRespPersonId] = useState<string>('')
@@ -233,10 +235,10 @@ export default function Gestao() {
   const [actionDueDate, setActionDueDate] = useState<string>('')
   const [actionOriginItemId, setActionOriginItemId] = useState<string>('')
 
-  // Estado do formulário de Edição de Limiares
+  // Formulário: Edição de Regras / Limiares
   const [editingThresholdKey, setEditingThresholdKey] = useState('')
   const [editingThresholdVal, setEditingThresholdVal] = useState<number>(1)
-  const [editingThresholdDesc, setEditingThresholdDesc] = useState('')
+  const [editingThresholdUnit, setEditingThresholdUnit] = useState('dias')
 
   // Mapas rápidos
   const peopleMap = useMemo(
@@ -245,7 +247,7 @@ export default function Gestao() {
   )
   const functionsMap = useMemo(() => new Map(roles.map((r) => [r.id, r.name])), [roles])
 
-  // Limiares em formato de objeto Record<key, number>
+  // Limiares em formato de dicionário
   const thresholdsObj = useMemo(() => {
     const map: Record<string, number> = {
       task_delay_tolerance_days: 1,
@@ -261,7 +263,7 @@ export default function Gestao() {
     return map
   }, [thresholds])
 
-  // Pendências do Dia DERIVADAS (D3_PENDING_ITEM: DERIVED)
+  // Pendências do dia computadas em tempo real
   const derivedPending = useMemo(() => {
     return derivePendingItems(
       {
@@ -276,7 +278,19 @@ export default function Gestao() {
     )
   }, [agendaItems, leads, tasks, roles, collaborators, thresholdsObj])
 
-  // Carregar dados de gestão e exceções
+  // Sincronização automática e silenciosa de pendências para a base de situações
+  const runAutoSync = useCallback(
+    async (currentDerived: typeof derivedPending, currentExceptions: ManagedException[]) => {
+      try {
+        await syncDerivedExceptionsToDatabase(currentDerived, currentExceptions)
+      } catch (err) {
+        console.warn('Sincronização em segundo plano:', err)
+      }
+    },
+    [],
+  )
+
+  // Carregar dados de gestão do Supabase
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
@@ -299,10 +313,9 @@ export default function Gestao() {
         ),
       )
 
-      // Anexar nomes às exceções
       const uiExceptions = dbExceptions.map((e) => ({
         ...e,
-        responsibleFunctionName: functionsMap.get(e.responsibleFunctionId) || 'Função',
+        responsibleFunctionName: functionsMap.get(e.responsibleFunctionId) || 'Função Operacional',
         responsiblePersonName: e.responsiblePersonId ? peopleMap.get(e.responsiblePersonId) : null,
         acknowledgedByName: e.acknowledgedByPersonId
           ? peopleMap.get(e.acknowledgedByPersonId)
@@ -318,7 +331,7 @@ export default function Gestao() {
       console.error('Falha ao carregar dados de gestão:', err)
       toast({
         title: 'Erro ao carregar dados de gestão',
-        description: err?.message || 'Falha na comunicação com o banco.',
+        description: err?.message || 'Falha na comunicação com o banco de dados.',
         variant: 'destructive',
       })
     } finally {
@@ -330,25 +343,31 @@ export default function Gestao() {
     loadData()
   }, [loadData])
 
-  // Ação: Reconhecer Exceção
+  // Sincronização automática idempotente ao detectar novas pendências
+  useEffect(() => {
+    if (!loading && derivedPending.length > 0) {
+      runAutoSync(derivedPending, exceptions)
+    }
+  }, [loading, derivedPending, exceptions, runAutoSync])
+
+  // Ações de gerenciamento das situações (exceções)
   const handleAcknowledgeException = async (exc: ManagedException) => {
     try {
       await acknowledgeException(exc.id)
       toast({
-        title: 'Exceção reconhecida',
-        description: `O desvio "${exc.title}" foi marcado como reconhecido pela gestão.`,
+        title: 'Situação reconhecida',
+        description: `Você registrou ciência sobre "${exc.title}".`,
       })
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Falha ao reconhecer exceção',
-        description: err?.message || 'Erro ao atualizar no banco de dados.',
+        title: 'Falha ao reconhecer situação',
+        description: err?.message || 'Erro ao atualizar no banco.',
         variant: 'destructive',
       })
     }
   }
 
-  // Ação: Abrir modal de decisão
   const handleOpenDecisionModal = (exc: ManagedException) => {
     setSelectedException(exc)
     setDecisionText(exc.decisionText || '')
@@ -356,13 +375,12 @@ export default function Gestao() {
     setDecisionModalOpen(true)
   }
 
-  // Submeter Decisão de Gestão
   const handleSaveDecision = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedException || !decisionText.trim()) {
       toast({
         title: 'Decisão obrigatória',
-        description: 'Descreva a decisão de gestão ou plano de ação adotado.',
+        description: 'Descreva a decisão tomada ou a orientação dada à equipe.',
         variant: 'destructive',
       })
       return
@@ -372,8 +390,8 @@ export default function Gestao() {
     try {
       await recordExceptionDecision(selectedException.id, decisionText, resolveImmediately)
       toast({
-        title: resolveImmediately ? 'Exceção resolvida' : 'Decisão registrada',
-        description: 'Registro de gestão atualizado com sucesso.',
+        title: resolveImmediately ? 'Situação resolvida' : 'Decisão registrada',
+        description: 'Registro de acompanhamento atualizado com sucesso.',
       })
       setDecisionModalOpen(false)
       setSelectedException(null)
@@ -381,7 +399,7 @@ export default function Gestao() {
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Erro ao salvar decisão',
+        title: 'Erro ao registrar decisão',
         description: err?.message || 'Falha inesperada.',
         variant: 'destructive',
       })
@@ -390,65 +408,46 @@ export default function Gestao() {
     }
   }
 
-  // Ação: Resolver Exceção
   const handleResolveException = async (exc: ManagedException) => {
     try {
       await resolveException(exc.id)
       toast({
-        title: 'Exceção marcada como resolvida',
-        description: `O desvio "${exc.title}" foi encerrado.`,
+        title: 'Situação concluída',
+        description: `"${exc.title}" foi marcada como resolvida.`,
       })
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Falha ao resolver exceção',
+        title: 'Falha ao resolver situação',
         description: err?.message || 'Erro no banco de dados.',
         variant: 'destructive',
       })
     }
   }
 
-  // Ação: Sincronizar Pendências Derivadas com a Tabela de Exceções
-  const handleSyncDerivedExceptions = async () => {
-    try {
-      const res = await syncDerivedExceptionsToDatabase(derivedPending, exceptions)
-      toast({
-        title: 'Sincronização concluída',
-        description: `${res.addedOrUpdatedCount} exceção(ões) derivada(s) processada(s) ou atualizada(s).`,
-      })
-      await loadData()
-    } catch (err: any) {
-      toast({
-        title: 'Falha na sincronização de exceções',
-        description: err?.message || 'Erro ao sincronizar.',
-        variant: 'destructive',
-      })
-    }
-  }
-
-  // Ação: Abrir modal de limiar
+  // Ações de Regras de Gestão (Limiares)
   const handleOpenThresholdModal = (cfg: OrgThresholdConfig) => {
     setEditingThresholdKey(cfg.key)
     setEditingThresholdVal(cfg.value)
-    setEditingThresholdDesc(cfg.description)
+    setEditingThresholdUnit(cfg.unit)
     setThresholdModalOpen(true)
   }
 
-  // Submeter Atualização de Limiar
   const handleUpdateThreshold = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
     try {
       await updateThresholdConfig(editingThresholdKey, Number(editingThresholdVal))
+      const human = getHumanThresholdInfo(editingThresholdKey)
       toast({
-        title: 'Limiar atualizado',
-        description: 'A política de escalonamento da organização foi atualizada com sucesso.',
+        title: 'Regra de gestão atualizada',
+        description: `"${human.label}" foi atualizada com sucesso.`,
       })
       setThresholdModalOpen(false)
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Falha ao atualizar limiar',
+        title: 'Falha ao atualizar regra',
         description: err?.message || 'Erro ao salvar no banco.',
         variant: 'destructive',
       })
@@ -457,13 +456,13 @@ export default function Gestao() {
     }
   }
 
-  // Submeter novo item de gestão
+  // Criar item de gestão (feedback / diretriz)
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!itemTitle.trim() || !itemContent.trim()) {
       toast({
         title: 'Campos obrigatórios',
-        description: 'Informe o título e o conteúdo do item de gestão.',
+        description: 'Informe o título e o conteúdo da orientação.',
         variant: 'destructive',
       })
       return
@@ -471,8 +470,8 @@ export default function Gestao() {
 
     if (itemVisibility === 'OWNER_ONLY' && !isOwner) {
       toast({
-        title: 'Permissão negada',
-        description: 'Apenas o OWNER da organização pode criar itens de nível OWNER_ONLY.',
+        title: 'Acesso restrito',
+        description: 'Apenas o proprietário (OWNER) pode registrar itens de nível Diretoria.',
         variant: 'destructive',
       })
       return
@@ -490,8 +489,8 @@ export default function Gestao() {
       })
 
       toast({
-        title: 'Item de gestão registrado',
-        description: 'Item salvo com sucesso na matriz de gestão.',
+        title: 'Orientação registrada',
+        description: 'Item salvo com sucesso no painel de gestão.',
       })
 
       setItemTitle('')
@@ -504,7 +503,7 @@ export default function Gestao() {
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Falha ao salvar item',
+        title: 'Falha ao salvar orientação',
         description: err?.message || 'Erro inesperado.',
         variant: 'destructive',
       })
@@ -513,13 +512,13 @@ export default function Gestao() {
     }
   }
 
-  // Submeter nova ação de gestão
+  // Criar ação de gestão
   const handleCreateAction = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!actionTitle.trim()) {
       toast({
         title: 'Título obrigatório',
-        description: 'Informe o título da ação corretiva ou estratégica.',
+        description: 'Informe o título da ação para a equipe.',
         variant: 'destructive',
       })
       return
@@ -537,8 +536,8 @@ export default function Gestao() {
       })
 
       toast({
-        title: 'Ação de gestão criada',
-        description: 'Ação registrada e atribuída aos responsáveis.',
+        title: 'Ação criada com sucesso',
+        description: 'Ação atribuída aos responsáveis com acompanhamento de prazo.',
       })
 
       setActionTitle('')
@@ -560,7 +559,6 @@ export default function Gestao() {
     }
   }
 
-  // Atualizar status de ação
   const handleUpdateActionStatus = async (actionId: string, newStatus: ManagementActionStatus) => {
     try {
       await updateManagementAction(actionId, { status: newStatus })
@@ -572,45 +570,59 @@ export default function Gestao() {
     } catch (err: any) {
       toast({
         title: 'Falha ao atualizar status',
-        description: err?.message || 'Erro ao comunicar com o servidor.',
+        description: err?.message || 'Erro de comunicação.',
         variant: 'destructive',
       })
     }
   }
 
-  // Excluir item de gestão (restrito a OWNER via RLS)
   const handleDeleteItem = async (itemId: string) => {
-    if (!confirm('Deseja realmente excluir este item de gestão?')) return
+    if (!confirm('Deseja realmente remover esta anotação?')) return
     try {
       await deleteManagementItem(itemId)
-      toast({ title: 'Item de gestão excluído' })
+      toast({ title: 'Item removido' })
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Exclusão negada',
-        description: err?.message || 'Apenas o OWNER pode excluir itens de gestão permanentemente.',
+        title: 'Exclusão não permitida',
+        description:
+          err?.message || 'Apenas o proprietário pode excluir anotações permanentemente.',
         variant: 'destructive',
       })
     }
   }
 
-  // Excluir ação de gestão (restrito a OWNER via RLS)
   const handleDeleteAction = async (actionId: string) => {
-    if (!confirm('Deseja realmente excluir esta ação de gestão?')) return
+    if (!confirm('Deseja realmente remover esta ação?')) return
     try {
       await deleteManagementAction(actionId)
-      toast({ title: 'Ação de gestão excluída' })
+      toast({ title: 'Ação removida' })
       await loadData()
     } catch (err: any) {
       toast({
-        title: 'Exclusão negada',
-        description: err?.message || 'Apenas o OWNER pode excluir ações de gestão.',
+        title: 'Exclusão não permitida',
+        description: err?.message || 'Apenas o proprietário pode excluir ações.',
         variant: 'destructive',
       })
     }
   }
 
-  // Filtragem das Exceções
+  // Situações que precisam de atenção (não resolvidas)
+  const activeExceptions = useMemo(() => {
+    return exceptions.filter((e) => e.status !== 'resolvida')
+  }, [exceptions])
+
+  // Contagens para o resumo do dia
+  const attentionCount = activeExceptions.length
+  const pendingCount = derivedPending.length
+  const ongoingActionsCount = actions.filter(
+    (a) => a.status === 'em_andamento' || a.status === 'pendente',
+  ).length
+  const hasCritical = activeExceptions.some(
+    (e) => e.severity === 'critica' || e.severity === 'alta',
+  )
+
+  // Filtragem das Situações que precisam de atenção
   const filteredExceptions = useMemo(() => {
     return exceptions.filter((exc) => {
       if (searchTerm) {
@@ -630,7 +642,7 @@ export default function Gestao() {
     })
   }, [exceptions, searchTerm, filterStatus, filterSeverity, filterFunction])
 
-  // Filtragem das Pendências Derivadas do Dia
+  // Filtragem das Pendências de hoje
   const filteredDerivedPending = useMemo(() => {
     return derivedPending.filter((p) => {
       if (searchTerm) {
@@ -648,7 +660,7 @@ export default function Gestao() {
     })
   }, [derivedPending, searchTerm, filterFunction, filterSeverity])
 
-  // Filtragem dos Itens de Gestão
+  // Filtragem dos Itens de Gestão (Feedbacks)
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       if (item.visibilityLevel === 'OWNER_ONLY' && !isOwner) {
@@ -705,296 +717,311 @@ export default function Gestao() {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Banner */}
-      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-700 to-emerald-600 flex items-center justify-center text-white shadow-md">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                Gestão Clínica Ser Único
-                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-teal-100 text-teal-900 border border-teal-300">
-                  v0.0.23
+      {/* 1. Header Resumo: "Hoje" - resposta imediata ao gerente em 5 segundos */}
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs uppercase tracking-wider font-extrabold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200">
+                Hoje na Clínica
+              </span>
+              {isOwner && (
+                <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-50 text-amber-900 border border-amber-300">
+                  Proprietário (OWNER)
                 </span>
-                {isOwner && (
-                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                    OWNER
-                  </span>
-                )}
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500">
-                Sistema Operacional do Gestor — Gestão por Exceção, Limiares Calibráveis e Ações por
-                Função
-              </p>
+              )}
             </div>
+
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              Gestão Clínica
+            </h1>
+
+            {/* Resumo em linha conforme pedido */}
+            <p className="text-sm sm:text-base font-medium text-slate-700 flex items-center gap-2 flex-wrap">
+              <span
+                className={
+                  attentionCount > 0
+                    ? hasCritical
+                      ? 'text-red-700 font-bold'
+                      : 'text-amber-800 font-semibold'
+                    : 'text-emerald-700'
+                }
+              >
+                {attentionCount === 0
+                  ? 'Nenhuma situação exige intervenção'
+                  : attentionCount === 1
+                    ? '1 situação precisa da sua atenção'
+                    : `${attentionCount} situações precisam da sua atenção`}
+              </span>
+              <span className="text-slate-300 hidden sm:inline">·</span>
+              <span className="text-slate-600">
+                {pendingCount === 1 ? '1 pendência' : `${pendingCount} pendências`}
+              </span>
+              <span className="text-slate-300 hidden sm:inline">·</span>
+              <span className="text-slate-600">
+                {ongoingActionsCount === 1
+                  ? '1 ação em andamento'
+                  : `${ongoingActionsCount} ações em andamento`}
+              </span>
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <Button
+              onClick={() => setItemModalOpen(true)}
+              size="sm"
+              className="bg-teal-700 hover:bg-teal-800 text-white font-medium shadow-xs gap-1.5 text-xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Nova Orientação</span>
+            </Button>
+
+            <Button
+              onClick={() => setActionModalOpen(true)}
+              size="sm"
+              variant="outline"
+              className="border-teal-600 text-teal-800 hover:bg-teal-50 font-medium gap-1.5 text-xs"
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-teal-700" />
+              <span>Nova Ação</span>
+            </Button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <Button
-            onClick={handleSyncDerivedExceptions}
-            variant="outline"
-            size="sm"
-            className="border-slate-300 text-slate-700 hover:bg-slate-50 text-xs gap-1.5"
-            title="Escanear evidências operacionais e atualizar painel de exceções"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-teal-700" />
-            <span>Sincronizar Exceções</span>
-          </Button>
-
-          <Button
-            onClick={() => setItemModalOpen(true)}
-            size="sm"
-            className="bg-teal-700 hover:bg-teal-800 text-white font-medium shadow-xs gap-1.5 text-xs"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Novo Item de Gestão</span>
-          </Button>
-
-          <Button
-            onClick={() => setActionModalOpen(true)}
-            size="sm"
-            variant="outline"
-            className="border-teal-600 text-teal-800 hover:bg-teal-50 font-medium gap-1.5 text-xs"
-          >
-            <TrendingUp className="w-3.5 h-3.5 text-teal-700" />
-            <span>Nova Ação</span>
-          </Button>
-        </div>
+        {/* Alerta de status geral / sob controle */}
+        {attentionCount === 0 && pendingCount === 0 && (
+          <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs sm:text-sm flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Operação sob controle. Nenhuma situação exige sua intervenção agora.</span>
+          </div>
+        )}
       </div>
 
-      {/* Tabs Switcher */}
-      <div className="flex items-center border-b border-slate-200 overflow-x-auto">
+      {/* 2. Seções Primárias de Navegação do Gerente */}
+      <div className="flex items-center border-b border-slate-200 overflow-x-auto gap-1">
         <button
-          onClick={() => setActiveTab('exceptions')}
-          className={`pb-3 px-4 text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
-            activeTab === 'exceptions'
-              ? 'border-teal-700 text-teal-900'
+          onClick={() => setActiveTab('attention')}
+          className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
+            activeTab === 'attention'
+              ? 'border-teal-700 text-teal-950 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <AlertCircle className="w-4 h-4 text-orange-600" />
-          <span>Exceções de Gestão ({filteredExceptions.length})</span>
+          <AlertCircle
+            className={`w-4 h-4 ${attentionCount > 0 ? 'text-red-600' : 'text-slate-400'}`}
+          />
+          <span>PRECISA DA SUA ATENÇÃO</span>
+          <span
+            className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
+              attentionCount > 0 ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {attentionCount}
+          </span>
         </button>
 
         <button
-          onClick={() => setActiveTab('pending_day')}
-          className={`pb-3 px-4 text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
-            activeTab === 'pending_day'
-              ? 'border-teal-700 text-teal-900'
+          onClick={() => setActiveTab('pending')}
+          className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
+            activeTab === 'pending'
+              ? 'border-teal-700 text-teal-950 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <ListTodo className="w-4 h-4 text-teal-600" />
-          <span>Pendências do Dia [Derivadas] ({filteredDerivedPending.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('items')}
-          className={`pb-3 px-4 text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
-            activeTab === 'items'
-              ? 'border-teal-700 text-teal-900'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span>Itens de Gestão ({filteredItems.length})</span>
+          <span>PENDÊNCIAS DE HOJE</span>
+          <span className="text-[11px] px-1.5 py-0.2 rounded-full font-bold bg-teal-100 text-teal-800">
+            {filteredDerivedPending.length}
+          </span>
         </button>
 
         <button
           onClick={() => setActiveTab('actions')}
-          className={`pb-3 px-4 text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
+          className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
             activeTab === 'actions'
-              ? 'border-teal-700 text-teal-900'
+              ? 'border-teal-700 text-teal-950 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <TrendingUp className="w-4 h-4" />
-          <span>Ações Corretivas ({filteredActions.length})</span>
+          <TrendingUp className="w-4 h-4 text-teal-700" />
+          <span>AÇÕES DE GESTÃO</span>
+          <span className="text-[11px] px-1.5 py-0.2 rounded-full font-bold bg-slate-100 text-slate-700">
+            {filteredActions.length}
+          </span>
         </button>
 
         <button
-          onClick={() => setActiveTab('thresholds')}
-          className={`pb-3 px-4 text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
-            activeTab === 'thresholds'
-              ? 'border-teal-700 text-teal-900'
+          onClick={() => setActiveTab('feedback')}
+          className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-2 ${
+            activeTab === 'feedback'
+              ? 'border-teal-700 text-teal-950 font-bold'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Sliders className="w-4 h-4" />
-          <span>Limiares Configuráveis ({thresholds.length})</span>
+          <MessageSquare className="w-4 h-4 text-slate-500" />
+          <span>FEEDBACKS E ORIENTAÇÕES</span>
+          <span className="text-[11px] px-1.5 py-0.2 rounded-full font-bold bg-slate-100 text-slate-700">
+            {filteredItems.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('rules')}
+          className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-2 ml-auto ${
+            activeTab === 'rules'
+              ? 'border-teal-700 text-teal-950 font-bold'
+              : 'border-transparent text-slate-400 hover:text-slate-700'
+          }`}
+          title="Regras operacionais e prazos de tolerância da clínica"
+        >
+          <Sliders className="w-3.5 h-3.5" />
+          <span className="text-xs">Regras de Gestão</span>
         </button>
       </div>
 
-      {/* Barra de Busca e Filtros */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
-          <Input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Pesquisar por título, motivo, desvio ou destinatário..."
-            className="pl-9 h-9 text-xs border-slate-200"
-          />
-        </div>
+      {/* Barra de Filtros e Busca Simplificada */}
+      {activeTab !== 'rules' && (
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center gap-2.5">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+            <Input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar por título, responsável ou assunto..."
+              className="pl-9 h-9 text-xs border-slate-200"
+            />
+          </div>
 
-        {/* Filtro de Severidade (para exceções e pendências) */}
-        {(activeTab === 'exceptions' || activeTab === 'pending_day') && (
-          <Select value={filterSeverity} onValueChange={setFilterSeverity}>
-            <SelectTrigger className="w-[140px] h-9 text-xs border-slate-200">
-              <SelectValue placeholder="Severidade" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas severidades</SelectItem>
-              <SelectItem value="baixa">Baixa</SelectItem>
-              <SelectItem value="media">Média</SelectItem>
-              <SelectItem value="alta">Alta</SelectItem>
-              <SelectItem value="critica">Crítica</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
-
-        {/* Filtro de Status das Exceções */}
-        {activeTab === 'exceptions' && (
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[150px] h-9 text-xs border-slate-200">
-              <SelectValue placeholder="Status exceção" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os status</SelectItem>
-              <SelectItem value="aberta">Aberta</SelectItem>
-              <SelectItem value="reconhecida">Reconhecida</SelectItem>
-              <SelectItem value="decidida">Decidida</SelectItem>
-              <SelectItem value="resolvida">Resolvida</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
-
-        {/* Filtros específicos de Itens de Gestão */}
-        {activeTab === 'items' && (
-          <>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-[160px] h-9 text-xs border-slate-200">
-                <SelectValue placeholder="Tipo de item" />
+          {/* Filtro de Severidade (para Atenção e Pendências) */}
+          {(activeTab === 'attention' || activeTab === 'pending') && (
+            <Select value={filterSeverity} onValueChange={setFilterSeverity}>
+              <SelectTrigger className="w-[140px] h-9 text-xs border-slate-200">
+                <SelectValue placeholder="Severidade" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos os tipos</SelectItem>
-                {Object.entries(TYPE_CONFIG).map(([k, v]) => (
-                  <SelectItem key={k} value={k}>
-                    {v.label}
-                  </SelectItem>
-                ))}
+                <SelectItem value="all">Todas severidades</SelectItem>
+                <SelectItem value="baixa">Atenção Leve</SelectItem>
+                <SelectItem value="media">Atenção Média</SelectItem>
+                <SelectItem value="alta">Prioridade Alta</SelectItem>
+                <SelectItem value="critica">Urgente / Crítico</SelectItem>
               </SelectContent>
             </Select>
+          )}
 
-            <Select value={filterVisibility} onValueChange={setFilterVisibility}>
-              <SelectTrigger className="w-[180px] h-9 text-xs border-slate-200">
-                <SelectValue placeholder="Nível de visibilidade" />
+          {/* Filtro de Status das Situações */}
+          {activeTab === 'attention' && (
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[160px] h-9 text-xs border-slate-200">
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todas visibilidades</SelectItem>
-                {Object.entries(VISIBILITY_CONFIG)
-                  .filter(([k]) => isOwner || k !== 'OWNER_ONLY')
-                  .map(([k, v]) => (
+                <SelectItem value="all">Todas situações</SelectItem>
+                <SelectItem value="aberta">Aguardando Decisão</SelectItem>
+                <SelectItem value="reconhecida">Ciente pela Gerência</SelectItem>
+                <SelectItem value="decidida">Decisão Registrada</SelectItem>
+                <SelectItem value="resolvida">Resolvida</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Filtro de Status para Ações */}
+          {activeTab === 'actions' && (
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[140px] h-9 text-xs border-slate-200">
+                <SelectValue placeholder="Status da Ação" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                <SelectItem value="concluida">Concluída</SelectItem>
+                <SelectItem value="cancelada">Cancelada</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Filtros específicos de Feedbacks e Orientações */}
+          {activeTab === 'feedback' && (
+            <>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-[160px] h-9 text-xs border-slate-200">
+                  <SelectValue placeholder="Tipo de Orientação" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os tipos</SelectItem>
+                  {Object.entries(TYPE_CONFIG).map(([k, v]) => (
                     <SelectItem key={k} value={k}>
                       {v.label}
                     </SelectItem>
                   ))}
-              </SelectContent>
-            </Select>
+                </SelectContent>
+              </Select>
 
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[140px] h-9 text-xs border-slate-200">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os status</SelectItem>
-                <SelectItem value="ativo">Ativo</SelectItem>
-                <SelectItem value="resolvido">Resolvido</SelectItem>
-                <SelectItem value="arquivado">Arquivado</SelectItem>
-              </SelectContent>
-            </Select>
-          </>
-        )}
+              <Select value={filterVisibility} onValueChange={setFilterVisibility}>
+                <SelectTrigger className="w-[180px] h-9 text-xs border-slate-200">
+                  <SelectValue placeholder="Visibilidade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas visibilidades</SelectItem>
+                  {Object.entries(VISIBILITY_CONFIG)
+                    .filter(([k]) => isOwner || k !== 'OWNER_ONLY')
+                    .map(([k, v]) => (
+                      <SelectItem key={k} value={k}>
+                        {v.label}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
 
-        {/* Filtro de Status para Ações */}
-        {activeTab === 'actions' && (
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-[140px] h-9 text-xs border-slate-200">
-              <SelectValue placeholder="Status ação" />
+          {/* Filtro por Função Responsável */}
+          <Select value={filterFunction} onValueChange={setFilterFunction}>
+            <SelectTrigger className="w-[160px] h-9 text-xs border-slate-200">
+              <SelectValue placeholder="Função Responsável" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os status</SelectItem>
-              <SelectItem value="pendente">Pendente</SelectItem>
-              <SelectItem value="em_andamento">Em Andamento</SelectItem>
-              <SelectItem value="concluida">Concluída</SelectItem>
-              <SelectItem value="cancelada">Cancelada</SelectItem>
+              <SelectItem value="all">Todas as funções</SelectItem>
+              {roles.map((r) => (
+                <SelectItem key={r.id} value={r.id}>
+                  {r.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
-        )}
 
-        {/* Filtro de Função */}
-        <Select value={filterFunction} onValueChange={setFilterFunction}>
-          <SelectTrigger className="w-[160px] h-9 text-xs border-slate-200">
-            <SelectValue placeholder="Função" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as funções</SelectItem>
-            {roles.map((r) => (
-              <SelectItem key={r.id} value={r.id}>
-                {r.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {(searchTerm ||
+            filterType !== 'all' ||
+            filterVisibility !== 'all' ||
+            filterStatus !== 'all' ||
+            filterFunction !== 'all' ||
+            filterSeverity !== 'all') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearchTerm('')
+                setFilterType('all')
+                setFilterVisibility('all')
+                setFilterStatus('all')
+                setFilterFunction('all')
+                setFilterPerson('all')
+                setFilterSeverity('all')
+              }}
+              className="text-xs text-slate-500 hover:text-slate-900 h-9 px-2.5"
+            >
+              Limpar filtros
+            </Button>
+          )}
+        </div>
+      )}
 
-        {(searchTerm ||
-          filterType !== 'all' ||
-          filterVisibility !== 'all' ||
-          filterStatus !== 'all' ||
-          filterFunction !== 'all' ||
-          filterSeverity !== 'all') && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSearchTerm('')
-              setFilterType('all')
-              setFilterVisibility('all')
-              setFilterStatus('all')
-              setFilterFunction('all')
-              setFilterPerson('all')
-              setFilterSeverity('all')
-            }}
-            className="text-xs text-slate-500 hover:text-slate-900 h-9"
-          >
-            Limpar filtros
-          </Button>
-        )}
-      </div>
-
-      {/* ABA 1: EXCEÇÕES DE GESTÃO */}
-      {activeTab === 'exceptions' && (
+      {/* SEÇÃO 1: PRECISA DA SUA ATENÇÃO (situações reais / escalonadas) */}
+      {activeTab === 'attention' && (
         <div className="space-y-4">
-          <div className="bg-amber-50/60 p-4 rounded-xl border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-semibold text-amber-950">
-                Princípio de Gestão por Exceção (Primary Manager Behavior)
-              </p>
-              <p className="text-amber-800/90 leading-relaxed">
-                Operações rotineiras em conformidade não geram ruído para a gestão. Apenas desvios
-                que ultrapassam os limiares calibrados da clínica são escalonados aqui, preservando
-                a atribuição da Função responsável.
-              </p>
-            </div>
-          </div>
-
           {loading ? (
             <div className="bg-white p-12 text-center rounded-xl border border-slate-200 text-slate-400">
-              Carregando exceções de gestão...
+              Carregando situações prioritárias...
             </div>
           ) : filteredExceptions.length === 0 ? (
             <div className="bg-white p-12 text-center rounded-xl border border-slate-200 space-y-3">
@@ -1002,20 +1029,12 @@ export default function Gestao() {
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <p className="text-base font-semibold text-slate-800">
-                Nenhuma exceção pendente encontrada.
+                Operação sob controle. Nenhuma situação exige sua intervenção agora.
               </p>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Todas as tarefas, agendamentos e follow-ups de leads estão dentro dos limiares de
-                tolerância configurados.
+                Tarefas, atendimentos e contatos estão dentro dos prazos acordados para as funções
+                da clínica.
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSyncDerivedExceptions}
-                className="text-xs mt-2"
-              >
-                Escanear evidências operacionais
-              </Button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1037,7 +1056,7 @@ export default function Gestao() {
                             className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] border ${sevCfg.badgeClass}`}
                           >
                             <SevIcon className="w-3 h-3" />
-                            Severidade: {sevCfg.label}
+                            {sevCfg.label}
                           </span>
 
                           <span
@@ -1048,7 +1067,7 @@ export default function Gestao() {
 
                           {exc.recurrenceCount > 1 && (
                             <span className="px-2 py-0.5 rounded-full text-[10px] bg-red-100 text-red-800 font-extrabold border border-red-300">
-                              Reincidência x{exc.recurrenceCount}
+                              {exc.recurrenceCount}ª reincidência
                             </span>
                           )}
                         </div>
@@ -1058,8 +1077,8 @@ export default function Gestao() {
                         </span>
                       </div>
 
-                      {/* Title & Description */}
-                      <div className="mt-3.5 space-y-2">
+                      {/* Título & Detalhes do que aconteceu */}
+                      <div className="mt-3.5 space-y-1.5">
                         <h3 className="text-base font-bold text-slate-900 leading-snug">
                           {exc.title}
                         </h3>
@@ -1068,27 +1087,27 @@ export default function Gestao() {
                         </p>
                       </div>
 
-                      {/* Invariante Handoff / Responsabilidade por Função */}
+                      {/* Função e Pessoa Responsável */}
                       <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-600 space-y-1.5">
                         <div className="flex items-center gap-1.5">
-                          <strong className="text-slate-400">Função Responsável:</strong>
+                          <strong className="text-slate-400">Função responsável:</strong>
                           <span className="inline-flex items-center gap-1 font-semibold text-teal-900 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
-                            🏢 {exc.responsibleFunctionName || 'Função'}
+                            🏢 {exc.responsibleFunctionName || 'Função Operacional'}
                           </span>
                         </div>
 
                         {exc.responsiblePersonName && (
                           <div className="flex items-center gap-1.5 text-slate-600">
-                            <span className="text-slate-400">Ocupante no Momento:</span>
+                            <span className="text-slate-400">Colaborador no posto:</span>
                             <span>👤 {exc.responsiblePersonName}</span>
                           </div>
                         )}
 
-                        {/* Decisão Registrada */}
+                        {/* Decisão já registrada */}
                         {exc.decisionText && (
                           <div className="mt-2 p-2.5 rounded-lg bg-blue-50/80 border border-blue-200 text-blue-950 space-y-1">
                             <div className="flex items-center justify-between text-[11px] font-bold text-blue-900">
-                              <span>Decisão da Gestão:</span>
+                              <span>Decisão da Gerência:</span>
                               {exc.decisionAt && (
                                 <span className="font-normal text-blue-700">
                                   {new Date(exc.decisionAt).toLocaleDateString('pt-BR')}
@@ -1101,7 +1120,7 @@ export default function Gestao() {
                       </div>
                     </div>
 
-                    {/* Actions Workflow (Reconhecer, Decidir, Resolver) */}
+                    {/* Ações e Decisões Esperadas do Gerente */}
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-2">
                         {exc.status === 'aberta' && (
@@ -1112,7 +1131,7 @@ export default function Gestao() {
                             className="text-xs h-8 border-amber-300 text-amber-800 hover:bg-amber-50"
                           >
                             <Check className="w-3.5 h-3.5 mr-1" />
-                            Reconhecer
+                            Estou ciente
                           </Button>
                         )}
 
@@ -1133,7 +1152,7 @@ export default function Gestao() {
                             className="text-xs h-8 border-emerald-300 text-emerald-800 hover:bg-emerald-50"
                           >
                             <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                            Resolver
+                            Concluir
                           </Button>
                         )}
                       </div>
@@ -1154,33 +1173,20 @@ export default function Gestao() {
         </div>
       )}
 
-      {/* ABA 2: PENDÊNCIAS DO DIA (DERIVADAS - D3) */}
-      {activeTab === 'pending_day' && (
+      {/* SEÇÃO 2: PENDÊNCIAS DE HOJE */}
+      {activeTab === 'pending' && (
         <div className="space-y-4">
-          <div className="bg-teal-50/60 p-4 rounded-xl border border-teal-200 text-xs text-teal-900 flex items-start gap-2.5">
-            <ListTodo className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-semibold text-teal-950">
-                Pendências do Dia (Decisão Arquitetural D3 — Query Derivada)
-              </p>
-              <p className="text-teal-800/90 leading-relaxed">
-                Este relatório é computado em tempo real comparando{' '}
-                <strong>Esperado vs Realizado</strong> a partir das tabelas operacionais (agenda,
-                tarefas, leads), sem duplicação ou tabelas redundantes de histórico diário.
-              </p>
-            </div>
-          </div>
-
           {filteredDerivedPending.length === 0 ? (
             <div className="bg-white p-12 text-center rounded-xl border border-slate-200 space-y-3">
               <div className="w-12 h-12 rounded-full bg-emerald-50 mx-auto flex items-center justify-center text-emerald-600">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <p className="text-base font-semibold text-slate-800">
-                Nenhuma pendência operacional em aberto para a data de hoje.
+                Operação sob controle. Nenhuma pendência em aberto para hoje.
               </p>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Todas as tarefas e follow-ups previstos foram concluídos pelas funções responsáveis.
+                Todas as tarefas operacionais e contatos com pacientes foram realizados pelas
+                funções responsáveis.
               </p>
             </div>
           ) : (
@@ -1189,13 +1195,13 @@ export default function Gestao() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase text-[10px] tracking-wider">
                     <tr>
-                      <th className="py-3 px-4 font-bold">Item Esperado</th>
-                      <th className="py-3 px-4 font-bold">Categoria</th>
+                      <th className="py-3 px-4 font-bold">Item Previsto</th>
+                      <th className="py-3 px-4 font-bold">Tipo</th>
                       <th className="py-3 px-4 font-bold">Data Prevista</th>
-                      <th className="py-3 px-4 font-bold">Desvio Observado</th>
+                      <th className="py-3 px-4 font-bold">Situação Atual</th>
                       <th className="py-3 px-4 font-bold">Função Responsável</th>
-                      <th className="py-3 px-4 font-bold">Severidade</th>
-                      <th className="py-3 px-4 font-bold">Decisão Gestão?</th>
+                      <th className="py-3 px-4 font-bold">Prioridade</th>
+                      <th className="py-3 px-4 font-bold">Exige Decisão?</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1241,10 +1247,10 @@ export default function Gestao() {
                             {p.managementDecisionRequired ? (
                               <span className="inline-flex items-center gap-1 text-red-700 font-bold text-[11px] bg-red-50 px-2 py-0.5 rounded border border-red-200">
                                 <AlertTriangle className="w-3 h-3 text-red-600" />
-                                Sim (Escalado)
+                                Sim (Atenção do Gestor)
                               </span>
                             ) : (
-                              <span className="text-slate-400 text-[11px]">Não (Tolerado)</span>
+                              <span className="text-slate-400 text-[11px]">Rotina operacional</span>
                             )}
                           </td>
                         </tr>
@@ -1258,144 +1264,7 @@ export default function Gestao() {
         </div>
       )}
 
-      {/* ABA 3: ITENS DE GESTÃO (FEEDBACK / NOTAS / DIRETRIZES) */}
-      {activeTab === 'items' && (
-        <div className="space-y-4">
-          {loading ? (
-            <div className="bg-white p-12 text-center rounded-xl border border-slate-200 text-slate-400">
-              Carregando itens de gestão...
-            </div>
-          ) : filteredItems.length === 0 ? (
-            <div className="bg-white p-12 text-center rounded-xl border border-slate-200 space-y-3">
-              <div className="w-12 h-12 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-slate-400">
-                <FileText className="w-6 h-6" />
-              </div>
-              <p className="text-base font-semibold text-slate-700">
-                Nenhum item de gestão encontrado.
-              </p>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
-                Registre feedbacks estruturados, notas privadas de desenvolvimento ou diretrizes
-                operacionais para as funções da clínica.
-              </p>
-              <Button
-                onClick={() => setItemModalOpen(true)}
-                className="bg-teal-700 hover:bg-teal-800 text-white text-xs mt-2"
-              >
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                Criar primeiro item
-              </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredItems.map((item) => {
-                const vis = VISIBILITY_CONFIG[item.visibilityLevel]
-                const VisIcon = vis.icon
-                const typeInfo = TYPE_CONFIG[item.type]
-                const isAcknowledged = !!item.acknowledgedAt
-
-                return (
-                  <div
-                    key={item.id}
-                    className="bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-5 shadow-2xs hover:shadow-md transition flex flex-col justify-between"
-                  >
-                    <div>
-                      {/* Top Badges */}
-                      <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span
-                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] border ${vis.badgeClass}`}
-                          >
-                            <VisIcon className="w-3 h-3" />
-                            {vis.label}
-                          </span>
-
-                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px] border border-slate-200">
-                            {typeInfo?.label || item.type}
-                          </span>
-                        </div>
-
-                        <span
-                          className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
-                            item.status === 'ativo'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}
-                        >
-                          {item.status.toUpperCase()}
-                        </span>
-                      </div>
-
-                      {/* Title & Content */}
-                      <div className="mt-3.5 space-y-2">
-                        <h3 className="text-base font-bold text-slate-900 leading-snug">
-                          {item.title}
-                        </h3>
-                        <p className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">
-                          {item.content}
-                        </p>
-                      </div>
-
-                      {/* Destinatários (Pessoa / Função) */}
-                      <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 space-y-1.5">
-                        {item.targetPersonName && (
-                          <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                            <span className="text-slate-400">Destinatário (Pessoa):</span>
-                            <span>👤 {item.targetPersonName}</span>
-                          </div>
-                        )}
-                        {item.targetFunctionName && (
-                          <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                            <span className="text-slate-400">Destinatário (Função):</span>
-                            <span>🏢 {item.targetFunctionName}</span>
-                          </div>
-                        )}
-
-                        {/* Reconhecimento */}
-                        {item.visibilityLevel === 'SHARED_WITH_EMPLOYEE' && (
-                          <div className="mt-2 text-[11px]">
-                            {isAcknowledged ? (
-                              <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 font-medium">
-                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                                Lido por {item.acknowledgedByName || 'colaborador'} em{' '}
-                                {new Date(item.acknowledgedAt!).toLocaleDateString('pt-BR')}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                                <Clock className="w-3 h-3 text-amber-600" />
-                                Aguardando leitura do colaborador
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Footer Info & Actions */}
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                      <div>
-                        Criado por <strong className="text-slate-600">{item.createdByName}</strong>{' '}
-                        em {new Date(item.createdAt).toLocaleDateString('pt-BR')}
-                      </div>
-
-                      {isOwner && (
-                        <button
-                          onClick={() => handleDeleteItem(item.id)}
-                          className="text-slate-400 hover:text-red-600 transition p-1"
-                          title="Excluir item (exclusivo OWNER)"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ABA 4: AÇÕES CORRETIVAS E ESTRATÉGICAS */}
+      {/* SEÇÃO 3: AÇÕES DE GESTÃO */}
       {activeTab === 'actions' && (
         <div className="space-y-4">
           {loading ? (
@@ -1408,11 +1277,11 @@ export default function Gestao() {
                 <TrendingUp className="w-6 h-6" />
               </div>
               <p className="text-base font-semibold text-slate-700">
-                Nenhuma ação corretiva ou estratégica cadastrada.
+                Nenhuma ação de gestão aberta no momento.
               </p>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
-                Crie ações de melhoria operacional, treinamentos ou alinhamentos estratégicos com
-                prazos e responsáveis definidos.
+                Crie ações de alinhamento com a equipe, treinamentos ou melhorias com prazos e
+                responsáveis.
               </p>
               <Button
                 onClick={() => setActionModalOpen(true)}
@@ -1488,13 +1357,13 @@ export default function Gestao() {
                         )}
                         {action.responsiblePersonName && (
                           <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                            <span className="text-slate-400">Responsável (Pessoa):</span>
+                            <span className="text-slate-400">Responsável:</span>
                             <span>👤 {action.responsiblePersonName}</span>
                           </div>
                         )}
                         {action.responsibleFunctionName && (
                           <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                            <span className="text-slate-400">Responsável (Função):</span>
+                            <span className="text-slate-400">Função:</span>
                             <span>🏢 {action.responsibleFunctionName}</span>
                           </div>
                         )}
@@ -1504,7 +1373,7 @@ export default function Gestao() {
                     {/* Footer Actions */}
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
                       <div className="flex items-center gap-2">
-                        <span className="text-slate-400">Alterar:</span>
+                        <span className="text-slate-400">Status:</span>
                         <select
                           value={action.status}
                           onChange={(e) =>
@@ -1526,7 +1395,7 @@ export default function Gestao() {
                         <button
                           onClick={() => handleDeleteAction(action.id)}
                           className="text-slate-400 hover:text-red-600 transition p-1"
-                          title="Excluir ação (exclusivo OWNER)"
+                          title="Remover ação (exclusivo OWNER)"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1540,82 +1409,231 @@ export default function Gestao() {
         </div>
       )}
 
-      {/* ABA 5: LIMIARES CONFIGURÁVEIS (D7_ESCALATION_THRESHOLDS) */}
-      {activeTab === 'thresholds' && (
+      {/* SEÇÃO 4: FEEDBACKS E ORIENTAÇÕES */}
+      {activeTab === 'feedback' && (
+        <div className="space-y-4">
+          {loading ? (
+            <div className="bg-white p-12 text-center rounded-xl border border-slate-200 text-slate-400">
+              Carregando feedbacks e orientações...
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="bg-white p-12 text-center rounded-xl border border-slate-200 space-y-3">
+              <div className="w-12 h-12 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-slate-400">
+                <FileText className="w-6 h-6" />
+              </div>
+              <p className="text-base font-semibold text-slate-700">
+                Nenhuma orientação ou feedback registrado.
+              </p>
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
+                Registre orientações individuais, feedbacks estruturados ou anotações internas da
+                gerência.
+              </p>
+              <Button
+                onClick={() => setItemModalOpen(true)}
+                className="bg-teal-700 hover:bg-teal-800 text-white text-xs mt-2"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                Registrar primeira orientação
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredItems.map((item) => {
+                const vis = VISIBILITY_CONFIG[item.visibilityLevel]
+                const VisIcon = vis.icon
+                const typeInfo = TYPE_CONFIG[item.type]
+                const isAcknowledged = !!item.acknowledgedAt
+
+                return (
+                  <div
+                    key={item.id}
+                    className="bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-5 shadow-2xs hover:shadow-md transition flex flex-col justify-between"
+                  >
+                    <div>
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] border ${vis.badgeClass}`}
+                          >
+                            <VisIcon className="w-3 h-3" />
+                            {vis.label}
+                          </span>
+
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-medium text-[11px] border border-slate-200">
+                            {typeInfo?.label || item.type}
+                          </span>
+                        </div>
+
+                        <span
+                          className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
+                            item.status === 'ativo'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {item.status.toUpperCase()}
+                        </span>
+                      </div>
+
+                      {/* Title & Content */}
+                      <div className="mt-3.5 space-y-2">
+                        <h3 className="text-base font-bold text-slate-900 leading-snug">
+                          {item.title}
+                        </h3>
+                        <p className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">
+                          {item.content}
+                        </p>
+                      </div>
+
+                      {/* Destinatários */}
+                      <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 space-y-1.5">
+                        {item.targetPersonName && (
+                          <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+                            <span className="text-slate-400">Destinatário:</span>
+                            <span>👤 {item.targetPersonName}</span>
+                          </div>
+                        )}
+                        {item.targetFunctionName && (
+                          <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+                            <span className="text-slate-400">Função:</span>
+                            <span>🏢 {item.targetFunctionName}</span>
+                          </div>
+                        )}
+
+                        {/* Confirmação de Leitura */}
+                        {item.visibilityLevel === 'SHARED_WITH_EMPLOYEE' && (
+                          <div className="mt-2 text-[11px]">
+                            {isAcknowledged ? (
+                              <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 font-medium">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                Lido por {item.acknowledgedByName || 'colaborador'} em{' '}
+                                {new Date(item.acknowledgedAt!).toLocaleDateString('pt-BR')}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                Aguardando leitura do colaborador
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Footer Info & Actions */}
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                      <div>
+                        Registrado por{' '}
+                        <strong className="text-slate-600">{item.createdByName}</strong> em{' '}
+                        {new Date(item.createdAt).toLocaleDateString('pt-BR')}
+                      </div>
+
+                      {isOwner && (
+                        <button
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="text-slate-400 hover:text-red-600 transition p-1"
+                          title="Remover anotação (exclusivo OWNER)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SEÇÃO SECUNDÁRIA: REGRAS DE GESTÃO (DISCLOSURE PROGRESSIVO) */}
+      {activeTab === 'rules' && (
         <div className="space-y-4">
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-start gap-2.5">
-            <Sliders className="w-4 h-4 text-slate-700 shrink-0 mt-0.5" />
+            <Info className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <p className="font-semibold text-slate-900">
-                Limiares Operacionais Configuráveis (D7_ESCALATION_THRESHOLDS)
+                Regras de Acompanhamento e Prazos da Clínica
               </p>
               <p className="leading-relaxed">
-                Nenhum limiar de tolerância de falhas, atrasos ou follow-up é gravado de forma
-                estática no código-fonte. Como gestor ou OWNER, você calibra a sensibilidade do
-                sistema para os fluxos da sua clínica.
+                Estas configurações determinam quando uma pendência da equipe deve ser apresentada à
+                gerência para decisão, permitindo que a rotina diária flua sem ruídos
+                desnecessários.
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {thresholds.map((cfg) => (
-              <div
-                key={cfg.id}
-                className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs hover:shadow-md transition flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <span className="font-mono text-[11px] text-teal-800 bg-teal-50 px-2 py-0.5 rounded font-semibold">
-                      {cfg.key}
-                    </span>
-                    <span className="text-xs font-bold text-slate-900">
-                      {cfg.value} {cfg.unit}
-                    </span>
+            {thresholds.map((cfg) => {
+              const human = getHumanThresholdInfo(cfg.key)
+              const unitText = human.unitLabel(cfg.value) || cfg.unit
+
+              return (
+                <div
+                  key={cfg.id}
+                  className="bg-white rounded-xl border border-slate-200 p-5 shadow-2xs hover:shadow-md transition flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <span className="text-xs font-bold text-slate-900">{human.label}</span>
+                      <span className="text-xs font-extrabold text-teal-800 bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                        {cfg.value} {unitText}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-600 mt-3 leading-relaxed">
+                      {human.description}
+                    </p>
+
+                    {human.example && (
+                      <p className="text-[11px] text-slate-400 mt-1 italic">{human.example}</p>
+                    )}
                   </div>
 
-                  <p className="text-xs text-slate-600 mt-3 leading-relaxed">{cfg.description}</p>
-                </div>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400">
+                      Atualizado em {new Date(cfg.updatedAt).toLocaleDateString('pt-BR')}
+                    </span>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400">
-                    Atualizado em {new Date(cfg.updatedAt).toLocaleDateString('pt-BR')}
-                  </span>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleOpenThresholdModal(cfg)}
-                    className="text-xs h-7 px-2.5 text-teal-800 border-teal-300 hover:bg-teal-50"
-                  >
-                    <Edit3 className="w-3 h-3 mr-1" />
-                    Calibrar
-                  </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenThresholdModal(cfg)}
+                      className="text-xs h-7 px-2.5 text-teal-800 border-teal-300 hover:bg-teal-50"
+                    >
+                      <Edit3 className="w-3 h-3 mr-1" />
+                      Ajustar regra
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* MODAL 1: Criar Item de Gestão */}
+      {/* MODAIS OPERACIONAIS */}
+
+      {/* MODAL 1: Nova Orientação / Feedback */}
       <Dialog open={itemModalOpen} onOpenChange={setItemModalOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Novo Item de Gestão</DialogTitle>
+            <DialogTitle>Nova Orientação / Feedback</DialogTitle>
             <DialogDescription>
-              Registre feedbacks estruturados, notas privadas ou diretrizes operacionais.
+              Registre orientações estruturadas, feedbacks de equipe ou anotações gerenciais.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreateItem} className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700">
-                Título do item <span className="text-red-500">*</span>
+                Título do assunto <span className="text-red-500">*</span>
               </Label>
               <Input
                 value={itemTitle}
                 onChange={(e) => setItemTitle(e.target.value)}
-                placeholder="Ex.: Feedback sobre follow-up de orçamentos"
+                placeholder="Ex.: Alinhamento sobre contato com novos pacientes"
                 className="h-10 text-xs"
                 required
               />
@@ -1623,7 +1641,7 @@ export default function Gestao() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">Tipo de item</Label>
+                <Label className="text-xs font-semibold text-slate-700">Tipo de orientação</Label>
                 <Select
                   value={itemType}
                   onValueChange={(val) => setItemType(val as ManagementItemType)}
@@ -1643,7 +1661,7 @@ export default function Gestao() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">
-                  Nível de Visibilidade <span className="text-red-500">*</span>
+                  Visibilidade <span className="text-red-500">*</span>
                 </Label>
                 <Select
                   value={itemVisibility}
@@ -1672,7 +1690,7 @@ export default function Gestao() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">
-                  Colaborador Alvo (opcional)
+                  Colaborador (opcional)
                 </Label>
                 <Select value={itemTargetPersonId} onValueChange={setItemTargetPersonId}>
                   <SelectTrigger className="h-10 text-xs">
@@ -1690,9 +1708,7 @@ export default function Gestao() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">
-                  Função Alvo (opcional)
-                </Label>
+                <Label className="text-xs font-semibold text-slate-700">Função (opcional)</Label>
                 <Select value={itemTargetFunctionId} onValueChange={setItemTargetFunctionId}>
                   <SelectTrigger className="h-10 text-xs">
                     <SelectValue placeholder="Selecione uma função" />
@@ -1716,7 +1732,7 @@ export default function Gestao() {
               <Textarea
                 value={itemContent}
                 onChange={(e) => setItemContent(e.target.value)}
-                placeholder="Descreva pontos de evidência, feedback ou diretrizes práticas..."
+                placeholder="Descreva pontos de evidência, feedback ou orientações práticas para a equipe..."
                 rows={4}
                 className="text-xs"
                 required
@@ -1737,18 +1753,18 @@ export default function Gestao() {
                 disabled={submitting}
                 className="bg-teal-700 hover:bg-teal-800 text-white text-xs"
               >
-                {submitting ? 'Salvando...' : 'Salvar Item'}
+                {submitting ? 'Salvando...' : 'Salvar Orientação'}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* MODAL 2: Criar Ação de Gestão */}
+      {/* MODAL 2: Nova Ação */}
       <Dialog open={actionModalOpen} onOpenChange={setActionModalOpen}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>Nova Ação Corretiva / Estratégica</DialogTitle>
+            <DialogTitle>Nova Ação de Gestão</DialogTitle>
             <DialogDescription>
               Crie uma tarefa ou compromisso de melhoria operacional com prazo e responsáveis.
             </DialogDescription>
@@ -1762,7 +1778,7 @@ export default function Gestao() {
               <Input
                 value={actionTitle}
                 onChange={(e) => setActionTitle(e.target.value)}
-                placeholder="Ex.: Treinamento intensivo sobre script de reativação"
+                placeholder="Ex.: Alinhamento presencial sobre reativação de orçamentos"
                 className="h-10 text-xs"
                 required
               />
@@ -1806,9 +1822,7 @@ export default function Gestao() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">
-                  Prazo de conclusão (Due Date)
-                </Label>
+                <Label className="text-xs font-semibold text-slate-700">Prazo de conclusão</Label>
                 <Input
                   type="date"
                   value={actionDueDate}
@@ -1818,15 +1832,13 @@ export default function Gestao() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">
-                  Origem (Item de gestão vinculado)
-                </Label>
+                <Label className="text-xs font-semibold text-slate-700">Orientação vinculada</Label>
                 <Select value={actionOriginItemId} onValueChange={setActionOriginItemId}>
                   <SelectTrigger className="h-10 text-xs">
-                    <SelectValue placeholder="Vincular a item existente" />
+                    <SelectValue placeholder="Vincular a orientação existente" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Nenhum item vinculado</SelectItem>
+                    <SelectItem value="none">Nenhuma orientação vinculada</SelectItem>
                     {items.map((i) => (
                       <SelectItem key={i.id} value={i.id}>
                         {i.title}
@@ -1839,12 +1851,12 @@ export default function Gestao() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700">
-                Descrição e plano de execução
+                Descrição e orientações
               </Label>
               <Textarea
                 value={actionDescription}
                 onChange={(e) => setActionDescription(e.target.value)}
-                placeholder="Detalhes operacionais sobre o que deve ser entregue..."
+                placeholder="Detalhes sobre o que deve ser realizado..."
                 rows={3}
                 className="text-xs"
               />
@@ -1871,13 +1883,13 @@ export default function Gestao() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL 3: Registrar Decisão sobre Exceção */}
+      {/* MODAL 3: Registrar Decisão sobre a Situação */}
       <Dialog open={decisionModalOpen} onOpenChange={setDecisionModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Registrar Decisão de Gestão</DialogTitle>
             <DialogDescription>
-              Defina a providência administrativa para o desvio observado.
+              Defina a providência administrativa para orientar a equipe.
             </DialogDescription>
           </DialogHeader>
 
@@ -1893,12 +1905,12 @@ export default function Gestao() {
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">
-                  Parecer da Gestão / Decisão Tomada <span className="text-red-500">*</span>
+                  Parecer da Gerência / Decisão Tomada <span className="text-red-500">*</span>
                 </Label>
                 <Textarea
                   value={decisionText}
                   onChange={(e) => setDecisionText(e.target.value)}
-                  placeholder="Ex.: Alinhado com o titular da função. Follow-up reagendado para amanhã e reforço do processo..."
+                  placeholder="Ex.: Alinhado com a equipe. Reagendado o contato para amanhã e reorientado o processo..."
                   rows={4}
                   className="text-xs"
                   required
@@ -1914,7 +1926,7 @@ export default function Gestao() {
                   className="rounded border-slate-300 text-teal-700 focus:ring-teal-600"
                 />
                 <Label htmlFor="resolveNow" className="text-xs text-slate-700 cursor-pointer">
-                  Marcar exceção como totalmente <strong>Resolvida</strong> de imediato
+                  Marcar situação como totalmente <strong>Concluída/Resolvida</strong> agora
                 </Label>
               </div>
 
@@ -1940,30 +1952,31 @@ export default function Gestao() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL 4: Calibrar Limiar da Organização (D7) */}
+      {/* MODAL 4: Ajustar Regra de Gestão */}
       <Dialog open={thresholdModalOpen} onOpenChange={setThresholdModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Calibrar Limiar Operacional</DialogTitle>
+            <DialogTitle>Ajustar Regra de Gestão</DialogTitle>
             <DialogDescription>
-              Ajuste o valor que dispara a elevação de exceções para esta organização.
+              Defina o limite de tolerância para acompanhamento da clínica.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleUpdateThreshold} className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Chave do Limiar</Label>
-              <Input
-                value={editingThresholdKey}
-                disabled
-                className="h-9 text-xs bg-slate-50 font-mono text-slate-600"
-              />
-              <p className="text-[11px] text-slate-500 mt-1">{editingThresholdDesc}</p>
-            </div>
+            {editingThresholdKey &&
+              (() => {
+                const info = getHumanThresholdInfo(editingThresholdKey)
+                return (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">{info.label}</Label>
+                    <p className="text-xs text-slate-600 leading-relaxed">{info.description}</p>
+                  </div>
+                )
+              })()}
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700">
-                Novo Valor Limiar <span className="text-red-500">*</span>
+                Novo Limite ({editingThresholdUnit}) <span className="text-red-500">*</span>
               </Label>
               <Input
                 type="number"
@@ -1990,7 +2003,7 @@ export default function Gestao() {
                 disabled={submitting}
                 className="bg-teal-700 hover:bg-teal-800 text-white text-xs"
               >
-                {submitting ? 'Salvando...' : 'Salvar Novo Limiar'}
+                {submitting ? 'Salvando...' : 'Salvar Regra'}
               </Button>
             </DialogFooter>
           </form>
