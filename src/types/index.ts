@@ -75,8 +75,11 @@ export interface FunctionCadenceSummary {
   functionColor: string
   currentOccupantId?: string | null
   currentOccupantName?: string | null
+  isMultiMember?: boolean
+  activeMembersCount?: number
   expectedRoutinesCount: number
   completedRoutinesCount: number
+  pendingRoutinesCount?: number
   adherencePct: number | null
   hasDeviation: boolean
   delayedCount: number

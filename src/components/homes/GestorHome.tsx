@@ -169,7 +169,7 @@ export const GestorHome: React.FC<GestorHomeProps> = ({
           </div>
         </div>
 
-        {/* Desvios de Cadência Hoje */}
+        {/* Atrasos Reais de Rotinas Hoje */}
         <div
           onClick={() => navigate('/gestao')}
           className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-amber-400 transition cursor-pointer group"
@@ -181,24 +181,27 @@ export const GestorHome: React.FC<GestorHomeProps> = ({
             <div className="text-2xl font-bold text-slate-900 tracking-tight">
               {deviationsCount}
             </div>
-            <p className="text-xs font-medium text-slate-500 truncate" title="Funções com desvio">
-              Funções com desvio de cadência
+            <p
+              className="text-xs font-medium text-slate-500 truncate"
+              title="Funções com atraso real"
+            >
+              Funções com atraso hoje
             </p>
           </div>
         </div>
       </div>
 
-      {/* 3. STAGE 4E: Painel de Cadência & Rotinas Recorrentes por Função */}
+      {/* 3. Acompanhamento Diário por Função */}
       <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <Layers className="w-5 h-5 text-teal-700" />
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                Cadência de Rotinas por Função (Esperado vs Realizado)
+                Acompanhamento Diário por Função
               </h2>
               <p className="text-xs text-slate-500">
-                Aderência das rotinas operacionais diárias de cada função na clínica
+                Visão operacional em tempo real das rotinas do dia e responsáveis
               </p>
             </div>
           </div>
@@ -216,12 +219,29 @@ export const GestorHome: React.FC<GestorHomeProps> = ({
 
         {cadenceLoading ? (
           <div className="py-8 text-center text-xs text-slate-400">
-            Calculando cadência operacional por função...
+            Carregando acompanhamento operacional por função...
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {cadenceSummaries.map((summary) => {
               const hasItems = summary.expectedRoutinesCount > 0
+              const isMultiMember =
+                summary.isMultiMember || summary.functionName.toLowerCase().includes('dentista')
+              const occupantLabel = isMultiMember
+                ? summary.activeMembersCount !== undefined
+                  ? `${summary.activeMembersCount} profissionais ativos`
+                  : summary.currentOccupantName || 'Profissionais ativos'
+                : summary.currentOccupantName
+                  ? summary.currentOccupantName.split(' ')[0]
+                  : 'Não atribuído'
+
+              const totalRoutines = summary.expectedRoutinesCount
+              const completedRoutines = summary.completedRoutinesCount
+              const pendingRoutines =
+                summary.pendingRoutinesCount ??
+                Math.max(0, totalRoutines - completedRoutines - summary.delayedCount)
+              const delayedRoutines = summary.delayedCount
+
               return (
                 <div
                   key={summary.functionId}
@@ -232,43 +252,63 @@ export const GestorHome: React.FC<GestorHomeProps> = ({
                   }`}
                 >
                   <div>
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
+                    {/* Cabeçalho "{Função} — {Ocupante}" */}
+                    <div className="flex items-start justify-between pb-2 border-b border-slate-100 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className="w-2.5 h-2.5 rounded-full"
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
                           style={{ backgroundColor: summary.functionColor }}
                         />
-                        <span className="text-xs font-bold text-slate-800">
-                          {summary.functionName}
+                        <span
+                          className="text-xs font-bold text-slate-800 truncate"
+                          title={`${summary.functionName} — ${occupantLabel}`}
+                        >
+                          {isMultiMember
+                            ? `Dentistas / ${occupantLabel}`
+                            : `${summary.functionName} — ${occupantLabel}`}
                         </span>
                       </div>
-                      <span className="text-[11px] font-semibold text-slate-500">
-                        {summary.completedRoutinesCount}/{summary.expectedRoutinesCount}
-                      </span>
-                    </div>
-
-                    <div className="mt-2.5">
-                      <Progress value={summary.adherencePct ?? 0} className="h-1.5 bg-slate-100" />
-                    </div>
-
-                    <div className="mt-3 text-xs space-y-1">
-                      <p className="text-[11px] text-slate-500">
-                        Ocupante atual:{' '}
-                        <strong className="text-slate-700">
-                          {summary.currentOccupantName || 'Não atribuído'}
-                        </strong>
-                      </p>
-                      {summary.hasDeviation && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">
-                          <AlertTriangle className="w-3 h-3" /> Desvio de cadência
+                      {delayedRoutines > 0 && (
+                        <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-red-800 bg-red-100 border border-red-200 px-1.5 py-0.5 rounded">
+                          {delayedRoutines} atrasada{delayedRoutines > 1 ? 's' : ''}
                         </span>
+                      )}
+                    </div>
+
+                    {/* Barra de Progresso quando há rotinas */}
+                    {hasItems && (
+                      <div className="mt-2.5">
+                        <Progress
+                          value={summary.adherencePct ?? 0}
+                          className="h-1.5 bg-slate-100"
+                        />
+                      </div>
+                    )}
+
+                    {/* Corpo Operacional Simples */}
+                    <div className="mt-3 text-xs space-y-1.5">
+                      {hasItems ? (
+                        <p className="text-xs text-slate-600 leading-snug">
+                          <strong className="text-slate-800">{totalRoutines}</strong> rotina
+                          {totalRoutines > 1 ? 's' : ''} prevista{totalRoutines > 1 ? 's' : ''} hoje
+                          · <strong className="text-emerald-700">{completedRoutines}</strong>{' '}
+                          concluída{completedRoutines > 1 ? 's' : ''} ·{' '}
+                          <strong className="text-slate-700">{pendingRoutines}</strong> pendente
+                          {pendingRoutines > 1 ? 's' : ''}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-400 italic py-1">
+                          Nenhuma rotina prevista hoje
+                        </p>
                       )}
                     </div>
                   </div>
 
                   <div className="pt-2 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-medium text-slate-500">
                     <span>
-                      {summary.adherencePct !== null ? `${summary.adherencePct}% aderência` : '—'}
+                      {hasItems && summary.adherencePct !== null
+                        ? `${summary.adherencePct}% concluído`
+                        : '—'}
                     </span>
                     <button
                       type="button"

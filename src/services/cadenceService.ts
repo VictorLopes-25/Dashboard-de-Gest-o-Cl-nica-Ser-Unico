@@ -76,13 +76,45 @@ export async function recordCadenceDailyLog(params: {
 }
 
 /**
- * Calcula em tempo real o resumo de cadência (Esperado vs Realizado de Rotinas)
+ * Helper para verificar se a janela de turno de uma rotina expirou no dia de hoje.
+ * - manha: expira às 12h
+ * - tarde: expira às 18h
+ * - noite: expira às 22h
+ * - dia_todo: expira ao fim do dia (23h59)
+ */
+export function isWindowExpired(
+  timeWindow: string | null | undefined,
+  referenceDate: Date = new Date(),
+): boolean {
+  const currentHour = referenceDate.getHours()
+  if (timeWindow === 'manha') {
+    return currentHour >= 12
+  }
+  if (timeWindow === 'tarde') {
+    return currentHour >= 18
+  }
+  if (timeWindow === 'noite') {
+    return currentHour >= 22
+  }
+  return false
+}
+
+/**
+ * Calcula em tempo real o resumo de cadência (Acompanhamento Diário por Função)
  * por função para uma data específica.
+ *
+ * REGRA CANÔNICA DE DESVIO:
+ * Rotina do dia dentro da janela = PENDENTE, nunca "desvio"/"atrasada"/exceção.
+ * Atraso real = due_date < hoje OU janela do turno já estourada (ex.: manha vista de tarde).
+ * Aderência parcial (ex.: 0% no início do dia) NÃO é desvio se não houver atraso real.
  */
 export async function computeCadenceSummary(
   targetDate: string = new Date().toISOString().slice(0, 10),
 ): Promise<FunctionCadenceSummary[]> {
   const orgId = await getOrganizationId()
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const isTargetToday = targetDate === todayIso
+  const isTargetPast = targetDate < todayIso
 
   const [funcsRes, tasksRes, agendaRes, faRes, peopleRes] = await Promise.all([
     supabase.from('functions').select('*').eq('organization_id', orgId).eq('active', true),
@@ -94,43 +126,75 @@ export async function computeCadenceSummary(
       .eq('due_date', targetDate)
       .neq('status', 'cancelado'),
     fetchActiveAssignments(),
-    supabase.from('people').select('id, name').eq('organization_id', orgId),
+    supabase.from('people').select('id, name, active').eq('organization_id', orgId),
   ])
 
   const functions = funcsRes.data || []
   const tasks = (tasksRes.data || []) as DbTask[]
   const agendaItems = agendaRes.data || []
   const peopleMap = new Map((peopleRes.data || []).map((p) => [p.id, p.name]))
+  const tasksMap = new Map(tasks.map((t) => [t.id, t]))
 
-  // Mapa de ocupante ativo por função
-  const activeOccupantMap = new Map<string, string>()
+  // Contagem de ocupantes ativos por função
+  const activeAssignmentsByFunc = new Map<string, string[]>()
   for (const fa of faRes) {
-    activeOccupantMap.set(fa.function_id, fa.person_id)
+    const list = activeAssignmentsByFunc.get(fa.function_id) || []
+    list.push(fa.person_id)
+    activeAssignmentsByFunc.set(fa.function_id, list)
   }
 
   const summaries: FunctionCadenceSummary[] = []
 
   for (const func of functions) {
-    const occupantPersonId = activeOccupantMap.get(func.id) || null
-    const occupantName = occupantPersonId ? peopleMap.get(occupantPersonId) || null : null
+    const isMultiMember = func.name.toLowerCase().includes('dentista')
+    const assignedPersonIds = activeAssignmentsByFunc.get(func.id) || []
+    const activeMembersCount = assignedPersonIds.length
+
+    let occupantPersonId: string | null = null
+    let occupantName: string | null = null
+
+    if (isMultiMember) {
+      occupantPersonId = null
+      occupantName = `${activeMembersCount} profissionais ativos`
+    } else {
+      occupantPersonId = assignedPersonIds[0] || null
+      occupantName = occupantPersonId ? peopleMap.get(occupantPersonId) || null : null
+    }
 
     // Rotinas configuradas para essa função
     const funcRoutineTasks = tasks.filter((t) => t.function_id === func.id)
 
-    // Ocorrências da agenda hoje para essa função
-    const funcTodayAgenda = agendaItems.filter((item) => item.function_id === func.id)
-    const completedItems = funcTodayAgenda.filter((item) => item.status === 'concluido')
-    const delayedItems = funcTodayAgenda.filter(
-      (item) => item.status === 'aberto' && item.due_date < targetDate,
-    )
+    // Ocorrências da agenda no targetDate para essa função
+    const funcAgendaItems = agendaItems.filter((item) => item.function_id === func.id)
+    const completedItems = funcAgendaItems.filter((item) => item.status === 'concluido')
+    const openItems = funcAgendaItems.filter((item) => item.status === 'aberto')
 
-    const expectedCount = funcTodayAgenda.length
+    // Itens com atraso REAL:
+    // 1. Data anterior a hoje
+    // 2. Se for hoje, janela do turno já expirou
+    // 3. Se a data avaliada for passada (isTargetPast), todo item aberto é atraso real
+    const delayedItems = openItems.filter((item) => {
+      if (item.due_date < todayIso) return true
+      if (isTargetPast) return true
+      if (isTargetToday) {
+        const originTask =
+          item.source_type === 'task' && item.source_id ? tasksMap.get(item.source_id) : undefined
+        const window = originTask?.time_window
+        return isWindowExpired(window)
+      }
+      return false
+    })
+
+    const expectedCount = funcAgendaItems.length
     const completedCount = completedItems.length
+    const pendingCount = openItems.length - delayedItems.length
     const adherencePct =
       expectedCount > 0 ? Math.round((completedCount / expectedCount) * 100) : null
 
-    // Se adherencePct < 70% ou houver atrasados, marca como desvio operacional
-    const hasDeviation = (adherencePct !== null && adherencePct < 70) || delayedItems.length > 0
+    // Desvio de cadência ocorre estritamente quando há ATRASO REAL (janela estourada ou due_date < hoje).
+    // Se a data já passou (isTargetPast) e sobraram pendências, também há desvio.
+    // Pendências do dia dentro da janela regular NUNCA são marcadas como desvio.
+    const hasDeviation = delayedItems.length > 0 || (isTargetPast && openItems.length > 0)
 
     summaries.push({
       functionId: func.id,
@@ -138,8 +202,11 @@ export async function computeCadenceSummary(
       functionColor: func.color || '#0F766E',
       currentOccupantId: occupantPersonId,
       currentOccupantName: occupantName,
+      isMultiMember,
+      activeMembersCount,
       expectedRoutinesCount: expectedCount,
       completedRoutinesCount: completedCount,
+      pendingRoutinesCount: Math.max(0, pendingCount),
       adherencePct,
       hasDeviation,
       delayedCount: delayedItems.length,

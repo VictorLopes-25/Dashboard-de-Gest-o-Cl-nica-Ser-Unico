@@ -385,7 +385,9 @@ export default function Funcoes() {
               <div className="pt-3 border-t border-slate-100 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Ocupante Atual:
+                    {role.name.toLowerCase().includes('dentista')
+                      ? 'Corpo Clínico:'
+                      : 'Ocupante Atual:'}
                   </span>
                   {isOwner && (
                     <Button
@@ -395,13 +397,29 @@ export default function Funcoes() {
                       className="h-6 text-[11px] px-2 py-0 text-teal-700 hover:text-teal-800 border-teal-200 hover:bg-teal-50"
                     >
                       <UserCheck className="w-3 h-3 mr-1" />
-                      Alterar ocupante
+                      {role.name.toLowerCase().includes('dentista')
+                        ? 'Gerenciar equipe'
+                        : 'Alterar ocupante'}
                     </Button>
                   )}
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-between">
-                  {linkedCollaborators.length > 0 ? (
+                  {role.name.toLowerCase().includes('dentista') ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px]">
+                        {linkedCollaborators.length}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-900 leading-tight">
+                          Dentistas / {linkedCollaborators.length} profissionais ativos
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          Função multi-membro com escala clínica
+                        </p>
+                      </div>
+                    </div>
+                  ) : linkedCollaborators.length > 0 ? (
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-[10px]">
                         {linkedCollaborators[0].name.charAt(0).toUpperCase()}
@@ -472,9 +490,21 @@ export default function Funcoes() {
               <div className="text-xs text-slate-600 space-y-1">
                 <p>
                   <strong>Ocupante atual:</strong>{' '}
-                  {collaborators.find(
-                    (c) => c.isActive && c.roleIds.includes(targetRoleForOccupant.id),
-                  )?.name || <span className="text-slate-400 italic">Nenhum ocupante ativo</span>}
+                  {targetRoleForOccupant.name.toLowerCase().includes('dentista') ? (
+                    <span className="font-semibold text-slate-800">
+                      Dentistas /{' '}
+                      {
+                        collaborators.filter(
+                          (c) => c.isActive && c.roleIds.includes(targetRoleForOccupant.id),
+                        ).length
+                      }{' '}
+                      profissionais ativos
+                    </span>
+                  ) : (
+                    collaborators.find(
+                      (c) => c.isActive && c.roleIds.includes(targetRoleForOccupant.id),
+                    )?.name || <span className="text-slate-400 italic">Nenhum ocupante ativo</span>
+                  )}
                 </p>
               </div>
             )}
