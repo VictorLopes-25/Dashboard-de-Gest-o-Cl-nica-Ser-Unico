@@ -2,7 +2,7 @@
   "name": "gestao-clinica-ser-unico",
   "description": "Sistema SKIP de Gestão Clínica Integrada - Ser Único",
   "private": true,
-  "version": "0.0.25",
+  "version": "0.0.26",
   "type": "module",
   "scripts": {
     "start": "vite dev",
