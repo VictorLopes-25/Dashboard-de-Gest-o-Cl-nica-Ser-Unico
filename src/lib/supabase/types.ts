@@ -1,11 +1,17 @@
 // AVOID UPDATING THIS FILE DIRECTLY. It is automatically generated.
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: '14.5'
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -23,10 +29,10 @@ export type Database = {
           person_id: string | null
           source_id: string | null
           source_type: string | null
-          status: Database['public']['Enums']['agenda_item_status']
+          status: Database["public"]["Enums"]["agenda_item_status"]
           title: string
           transferred: boolean
-          type: Database['public']['Enums']['agenda_item_type']
+          type: Database["public"]["Enums"]["agenda_item_type"]
         }
         Insert: {
           completed_at?: string | null
@@ -41,10 +47,10 @@ export type Database = {
           person_id?: string | null
           source_id?: string | null
           source_type?: string | null
-          status?: Database['public']['Enums']['agenda_item_status']
+          status?: Database["public"]["Enums"]["agenda_item_status"]
           title: string
           transferred?: boolean
-          type: Database['public']['Enums']['agenda_item_type']
+          type: Database["public"]["Enums"]["agenda_item_type"]
         }
         Update: {
           completed_at?: string | null
@@ -59,32 +65,32 @@ export type Database = {
           person_id?: string | null
           source_id?: string | null
           source_type?: string | null
-          status?: Database['public']['Enums']['agenda_item_status']
+          status?: Database["public"]["Enums"]["agenda_item_status"]
           title?: string
           transferred?: boolean
-          type?: Database['public']['Enums']['agenda_item_type']
+          type?: Database["public"]["Enums"]["agenda_item_type"]
         }
         Relationships: [
           {
-            foreignKeyName: 'agenda_items_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "agenda_items_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'fk_agenda_function'
-            columns: ['function_id', 'organization_id']
+            foreignKeyName: "fk_agenda_function"
+            columns: ["function_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "functions"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'fk_agenda_person'
-            columns: ['person_id', 'organization_id']
+            foreignKeyName: "fk_agenda_person"
+            columns: ["person_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "people"
+            referencedColumns: ["id", "organization_id"]
           },
         ]
       }
@@ -112,18 +118,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'areas_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "areas_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'fk_areas_function'
-            columns: ['function_id', 'organization_id']
+            foreignKeyName: "fk_areas_function"
+            columns: ["function_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "functions"
+            referencedColumns: ["id", "organization_id"]
           },
         ]
       }
@@ -160,25 +166,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'fk_fa_function'
-            columns: ['function_id', 'organization_id']
+            foreignKeyName: "fk_fa_function"
+            columns: ["function_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "functions"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'fk_fa_person'
-            columns: ['person_id', 'organization_id']
+            foreignKeyName: "fk_fa_person"
+            columns: ["person_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "people"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'function_assignments_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "function_assignments_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -224,25 +230,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'function_cadence_logs_function_id_fkey'
-            columns: ['function_id']
+            foreignKeyName: "function_cadence_logs_function_id_fkey"
+            columns: ["function_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id']
+            referencedRelation: "functions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'function_cadence_logs_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "function_cadence_logs_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'function_cadence_logs_person_id_fkey'
-            columns: ['person_id']
+            foreignKeyName: "function_cadence_logs_person_id_fkey"
+            columns: ["person_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id']
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -273,11 +279,81 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'functions_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "functions_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      goals: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          metric: string
+          metric_label: string
+          organization_id: string
+          period_end: string
+          period_start: string
+          period_type: string
+          responsible_function_id: string
+          status: string
+          target: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metric: string
+          metric_label: string
+          organization_id: string
+          period_end: string
+          period_start: string
+          period_type?: string
+          responsible_function_id: string
+          status?: string
+          target: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metric?: string
+          metric_label?: string
+          organization_id?: string
+          period_end?: string
+          period_start?: string
+          period_type?: string
+          responsible_function_id?: string
+          status?: string
+          target?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "goals_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "goals_responsible_function_id_fkey"
+            columns: ["responsible_function_id"]
+            isOneToOne: false
+            referencedRelation: "functions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -326,32 +402,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'fk_lc_function'
-            columns: ['function_id', 'organization_id']
+            foreignKeyName: "fk_lc_function"
+            columns: ["function_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "functions"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'fk_lc_lead'
-            columns: ['lead_id', 'organization_id']
+            foreignKeyName: "fk_lc_lead"
+            columns: ["lead_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'leads'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "leads"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'fk_lc_person'
-            columns: ['person_id', 'organization_id']
+            foreignKeyName: "fk_lc_person"
+            columns: ["person_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "people"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'lead_contacts_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "lead_contacts_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -376,13 +452,13 @@ export type Database = {
           next_contact_at: string | null
           next_follow_up_at: string | null
           organization_id: string
-          origin: Database['public']['Enums']['lead_origin']
+          origin: Database["public"]["Enums"]["lead_origin"]
           phone: string | null
           referred_by_lead_id: string | null
           referred_by_name: string | null
           sale_date: string | null
           sale_value: number | null
-          stage: Database['public']['Enums']['lead_stage']
+          stage: Database["public"]["Enums"]["lead_stage"]
           updated_at: string
         }
         Insert: {
@@ -405,13 +481,13 @@ export type Database = {
           next_contact_at?: string | null
           next_follow_up_at?: string | null
           organization_id: string
-          origin?: Database['public']['Enums']['lead_origin']
+          origin?: Database["public"]["Enums"]["lead_origin"]
           phone?: string | null
           referred_by_lead_id?: string | null
           referred_by_name?: string | null
           sale_date?: string | null
           sale_value?: number | null
-          stage?: Database['public']['Enums']['lead_stage']
+          stage?: Database["public"]["Enums"]["lead_stage"]
           updated_at?: string
         }
         Update: {
@@ -434,50 +510,50 @@ export type Database = {
           next_contact_at?: string | null
           next_follow_up_at?: string | null
           organization_id?: string
-          origin?: Database['public']['Enums']['lead_origin']
+          origin?: Database["public"]["Enums"]["lead_origin"]
           phone?: string | null
           referred_by_lead_id?: string | null
           referred_by_name?: string | null
           sale_date?: string | null
           sale_value?: number | null
-          stage?: Database['public']['Enums']['lead_stage']
+          stage?: Database["public"]["Enums"]["lead_stage"]
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'fk_leads_commercial_function'
-            columns: ['commercial_function_id', 'organization_id']
+            foreignKeyName: "fk_leads_commercial_function"
+            columns: ["commercial_function_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "functions"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'fk_leads_commercial_person'
-            columns: ['commercial_person_id', 'organization_id']
+            foreignKeyName: "fk_leads_commercial_person"
+            columns: ["commercial_person_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "people"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'fk_leads_evaluator'
-            columns: ['evaluator_person_id', 'organization_id']
+            foreignKeyName: "fk_leads_evaluator"
+            columns: ["evaluator_person_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "people"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'fk_leads_referred_by'
-            columns: ['referred_by_lead_id', 'organization_id']
+            foreignKeyName: "fk_leads_referred_by"
+            columns: ["referred_by_lead_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'leads'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "leads"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'leads_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "leads_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -501,10 +577,10 @@ export type Database = {
           resolved_at: string | null
           responsible_function_id: string
           responsible_person_id: string | null
-          severity: Database['public']['Enums']['exception_severity']
-          status: Database['public']['Enums']['exception_status']
+          severity: Database["public"]["Enums"]["exception_severity"]
+          status: Database["public"]["Enums"]["exception_status"]
           title: string
-          type: Database['public']['Enums']['exception_type']
+          type: Database["public"]["Enums"]["exception_type"]
           updated_at: string
         }
         Insert: {
@@ -526,10 +602,10 @@ export type Database = {
           resolved_at?: string | null
           responsible_function_id: string
           responsible_person_id?: string | null
-          severity?: Database['public']['Enums']['exception_severity']
-          status?: Database['public']['Enums']['exception_status']
+          severity?: Database["public"]["Enums"]["exception_severity"]
+          status?: Database["public"]["Enums"]["exception_status"]
           title: string
-          type: Database['public']['Enums']['exception_type']
+          type: Database["public"]["Enums"]["exception_type"]
           updated_at?: string
         }
         Update: {
@@ -551,47 +627,47 @@ export type Database = {
           resolved_at?: string | null
           responsible_function_id?: string
           responsible_person_id?: string | null
-          severity?: Database['public']['Enums']['exception_severity']
-          status?: Database['public']['Enums']['exception_status']
+          severity?: Database["public"]["Enums"]["exception_severity"]
+          status?: Database["public"]["Enums"]["exception_status"]
           title?: string
-          type?: Database['public']['Enums']['exception_type']
+          type?: Database["public"]["Enums"]["exception_type"]
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'managed_exceptions_acknowledged_by_person_id_fkey'
-            columns: ['acknowledged_by_person_id']
+            foreignKeyName: "managed_exceptions_acknowledged_by_person_id_fkey"
+            columns: ["acknowledged_by_person_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id']
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'managed_exceptions_decision_by_person_id_fkey'
-            columns: ['decision_by_person_id']
+            foreignKeyName: "managed_exceptions_decision_by_person_id_fkey"
+            columns: ["decision_by_person_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id']
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'managed_exceptions_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "managed_exceptions_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'managed_exceptions_responsible_function_id_fkey'
-            columns: ['responsible_function_id']
+            foreignKeyName: "managed_exceptions_responsible_function_id_fkey"
+            columns: ["responsible_function_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id']
+            referencedRelation: "functions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'managed_exceptions_responsible_person_id_fkey'
-            columns: ['responsible_person_id']
+            foreignKeyName: "managed_exceptions_responsible_person_id_fkey"
+            columns: ["responsible_person_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id']
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -607,7 +683,7 @@ export type Database = {
           origin_item_id: string | null
           responsible_function_id: string | null
           responsible_person_id: string | null
-          status: Database['public']['Enums']['management_action_status']
+          status: Database["public"]["Enums"]["management_action_status"]
           title: string
           updated_at: string
         }
@@ -622,7 +698,7 @@ export type Database = {
           origin_item_id?: string | null
           responsible_function_id?: string | null
           responsible_person_id?: string | null
-          status?: Database['public']['Enums']['management_action_status']
+          status?: Database["public"]["Enums"]["management_action_status"]
           title: string
           updated_at?: string
         }
@@ -637,45 +713,45 @@ export type Database = {
           origin_item_id?: string | null
           responsible_function_id?: string | null
           responsible_person_id?: string | null
-          status?: Database['public']['Enums']['management_action_status']
+          status?: Database["public"]["Enums"]["management_action_status"]
           title?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'management_actions_created_by_person_id_fkey'
-            columns: ['created_by_person_id']
+            foreignKeyName: "management_actions_created_by_person_id_fkey"
+            columns: ["created_by_person_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id']
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'management_actions_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "management_actions_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'management_actions_origin_item_id_fkey'
-            columns: ['origin_item_id']
+            foreignKeyName: "management_actions_origin_item_id_fkey"
+            columns: ["origin_item_id"]
             isOneToOne: false
-            referencedRelation: 'management_items'
-            referencedColumns: ['id']
+            referencedRelation: "management_items"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'management_actions_responsible_function_id_fkey'
-            columns: ['responsible_function_id']
+            foreignKeyName: "management_actions_responsible_function_id_fkey"
+            columns: ["responsible_function_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id']
+            referencedRelation: "functions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'management_actions_responsible_person_id_fkey'
-            columns: ['responsible_person_id']
+            foreignKeyName: "management_actions_responsible_person_id_fkey"
+            columns: ["responsible_person_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id']
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -688,13 +764,13 @@ export type Database = {
           created_by_person_id: string | null
           id: string
           organization_id: string
-          status: Database['public']['Enums']['management_item_status']
+          status: Database["public"]["Enums"]["management_item_status"]
           target_function_id: string | null
           target_person_id: string | null
           title: string
-          type: Database['public']['Enums']['management_item_type']
+          type: Database["public"]["Enums"]["management_item_type"]
           updated_at: string
-          visibility_level: Database['public']['Enums']['management_visibility_level']
+          visibility_level: Database["public"]["Enums"]["management_visibility_level"]
         }
         Insert: {
           acknowledged_at?: string | null
@@ -704,13 +780,13 @@ export type Database = {
           created_by_person_id?: string | null
           id?: string
           organization_id: string
-          status?: Database['public']['Enums']['management_item_status']
+          status?: Database["public"]["Enums"]["management_item_status"]
           target_function_id?: string | null
           target_person_id?: string | null
           title: string
-          type: Database['public']['Enums']['management_item_type']
+          type: Database["public"]["Enums"]["management_item_type"]
           updated_at?: string
-          visibility_level: Database['public']['Enums']['management_visibility_level']
+          visibility_level: Database["public"]["Enums"]["management_visibility_level"]
         }
         Update: {
           acknowledged_at?: string | null
@@ -720,49 +796,49 @@ export type Database = {
           created_by_person_id?: string | null
           id?: string
           organization_id?: string
-          status?: Database['public']['Enums']['management_item_status']
+          status?: Database["public"]["Enums"]["management_item_status"]
           target_function_id?: string | null
           target_person_id?: string | null
           title?: string
-          type?: Database['public']['Enums']['management_item_type']
+          type?: Database["public"]["Enums"]["management_item_type"]
           updated_at?: string
-          visibility_level?: Database['public']['Enums']['management_visibility_level']
+          visibility_level?: Database["public"]["Enums"]["management_visibility_level"]
         }
         Relationships: [
           {
-            foreignKeyName: 'management_items_acknowledged_by_person_id_fkey'
-            columns: ['acknowledged_by_person_id']
+            foreignKeyName: "management_items_acknowledged_by_person_id_fkey"
+            columns: ["acknowledged_by_person_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id']
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'management_items_created_by_person_id_fkey'
-            columns: ['created_by_person_id']
+            foreignKeyName: "management_items_created_by_person_id_fkey"
+            columns: ["created_by_person_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id']
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'management_items_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "management_items_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'management_items_target_function_id_fkey'
-            columns: ['target_function_id']
+            foreignKeyName: "management_items_target_function_id_fkey"
+            columns: ["target_function_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id']
+            referencedRelation: "functions"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'management_items_target_person_id_fkey'
-            columns: ['target_person_id']
+            foreignKeyName: "management_items_target_person_id_fkey"
+            columns: ["target_person_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id']
+            referencedRelation: "people"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -799,11 +875,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'org_threshold_configs_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "org_threshold_configs_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -832,7 +908,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
-          org_role: Database['public']['Enums']['org_role_type'] | null
+          org_role: Database["public"]["Enums"]["org_role_type"] | null
           organization_id: string
         }
         Insert: {
@@ -841,7 +917,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
-          org_role?: Database['public']['Enums']['org_role_type'] | null
+          org_role?: Database["public"]["Enums"]["org_role_type"] | null
           organization_id: string
         }
         Update: {
@@ -850,16 +926,16 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
-          org_role?: Database['public']['Enums']['org_role_type'] | null
+          org_role?: Database["public"]["Enums"]["org_role_type"] | null
           organization_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'people_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "people_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -920,11 +996,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'scripts_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "scripts_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -942,7 +1018,7 @@ export type Database = {
           is_routine: boolean | null
           organization_id: string
           priority: string | null
-          recurrence: Database['public']['Enums']['recurrence_type']
+          recurrence: Database["public"]["Enums"]["recurrence_type"]
           recurrence_day: number | null
           time_window: string | null
           title: string
@@ -960,7 +1036,7 @@ export type Database = {
           is_routine?: boolean | null
           organization_id: string
           priority?: string | null
-          recurrence?: Database['public']['Enums']['recurrence_type']
+          recurrence?: Database["public"]["Enums"]["recurrence_type"]
           recurrence_day?: number | null
           time_window?: string | null
           title: string
@@ -978,39 +1054,39 @@ export type Database = {
           is_routine?: boolean | null
           organization_id?: string
           priority?: string | null
-          recurrence?: Database['public']['Enums']['recurrence_type']
+          recurrence?: Database["public"]["Enums"]["recurrence_type"]
           recurrence_day?: number | null
           time_window?: string | null
           title?: string
         }
         Relationships: [
           {
-            foreignKeyName: 'fk_tasks_area'
-            columns: ['area_id', 'organization_id']
+            foreignKeyName: "fk_tasks_area"
+            columns: ["area_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'areas'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "areas"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'fk_tasks_function'
-            columns: ['function_id', 'organization_id']
+            foreignKeyName: "fk_tasks_function"
+            columns: ["function_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'functions'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "functions"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'fk_tasks_person'
-            columns: ['default_person_id', 'organization_id']
+            foreignKeyName: "fk_tasks_person"
+            columns: ["default_person_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'people'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "people"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'tasks_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "tasks_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1022,7 +1098,7 @@ export type Database = {
           lead_id: string
           name: string
           organization_id: string
-          status: Database['public']['Enums']['treatment_status']
+          status: Database["public"]["Enums"]["treatment_status"]
         }
         Insert: {
           completed_at?: string | null
@@ -1031,7 +1107,7 @@ export type Database = {
           lead_id: string
           name: string
           organization_id: string
-          status?: Database['public']['Enums']['treatment_status']
+          status?: Database["public"]["Enums"]["treatment_status"]
         }
         Update: {
           completed_at?: string | null
@@ -1040,22 +1116,22 @@ export type Database = {
           lead_id?: string
           name?: string
           organization_id?: string
-          status?: Database['public']['Enums']['treatment_status']
+          status?: Database["public"]["Enums"]["treatment_status"]
         }
         Relationships: [
           {
-            foreignKeyName: 'fk_treatment_lead'
-            columns: ['lead_id', 'organization_id']
+            foreignKeyName: "fk_treatment_lead"
+            columns: ["lead_id", "organization_id"]
             isOneToOne: false
-            referencedRelation: 'leads'
-            referencedColumns: ['id', 'organization_id']
+            referencedRelation: "leads"
+            referencedColumns: ["id", "organization_id"]
           },
           {
-            foreignKeyName: 'treatments_organization_id_fkey'
-            columns: ['organization_id']
+            foreignKeyName: "treatments_organization_id_fkey"
+            columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: 'organizations'
-            referencedColumns: ['id']
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1081,11 +1157,13 @@ export type Database = {
         Args: { owner_name: string; target_org_id: string }
         Returns: Json
       }
+      calculate_goal_metric: { Args: { p_goal_id: string }; Returns: Json }
+      calculate_goals_for_organization: { Args: never; Returns: Json }
       current_function_ids: { Args: never; Returns: string[] }
       current_org_id: { Args: never; Returns: string }
       current_org_role: {
         Args: never
-        Returns: Database['public']['Enums']['org_role_type']
+        Returns: Database["public"]["Enums"]["org_role_type"]
       }
       current_person: {
         Args: never
@@ -1095,12 +1173,12 @@ export type Database = {
           created_at: string
           id: string
           name: string
-          org_role: Database['public']['Enums']['org_role_type'] | null
+          org_role: Database["public"]["Enums"]["org_role_type"] | null
           organization_id: string
         }
         SetofOptions: {
-          from: '*'
-          to: 'people'
+          from: "*"
+          to: "people"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1122,59 +1200,73 @@ export type Database = {
           p_entity_type: string
           p_responsible_function_id: string
           p_responsible_person_id: string
-          p_severity: Database['public']['Enums']['exception_severity']
+          p_severity: Database["public"]["Enums"]["exception_severity"]
           p_title: string
-          p_type: Database['public']['Enums']['exception_type']
+          p_type: Database["public"]["Enums"]["exception_type"]
         }
         Returns: Json
       }
     }
     Enums: {
-      agenda_item_status: 'aberto' | 'concluido' | 'cancelado'
-      agenda_item_type: 'tarefa' | 'compromisso' | 'follow_up' | 'pos_venda' | 'pendencia'
-      exception_severity: 'baixa' | 'media' | 'alta' | 'critica'
-      exception_status: 'aberta' | 'reconhecida' | 'decidida' | 'resolvida'
+      agenda_item_status: "aberto" | "concluido" | "cancelado"
+      agenda_item_type:
+        | "tarefa"
+        | "compromisso"
+        | "follow_up"
+        | "pos_venda"
+        | "pendencia"
+      exception_severity: "baixa" | "media" | "alta" | "critica"
+      exception_status: "aberta" | "reconhecida" | "decidida" | "resolvida"
       exception_type:
-        | 'tarefa_atrasada'
-        | 'ocorrencia_perdida'
-        | 'lead_sem_followup'
-        | 'falhas_recorrentes'
-        | 'outro_desvio'
+        | "tarefa_atrasada"
+        | "ocorrencia_perdida"
+        | "lead_sem_followup"
+        | "falhas_recorrentes"
+        | "outro_desvio"
       lead_origin:
-        | 'indicacao'
-        | 'meta_ads'
-        | 'google'
-        | 'organico'
-        | 'reativacao'
-        | 'campanha'
-        | 'parceiro'
-        | 'outros'
+        | "indicacao"
+        | "meta_ads"
+        | "google"
+        | "organico"
+        | "reativacao"
+        | "campanha"
+        | "parceiro"
+        | "outros"
       lead_stage:
-        | 'novo'
-        | 'avaliacao_agendada'
-        | 'nao_compareceu'
-        | 'avaliacao_realizada'
-        | 'proposta_enviada'
-        | 'fechado'
-        | 'perdido'
-      management_action_status: 'pendente' | 'em_andamento' | 'concluida' | 'cancelada'
-      management_item_status: 'ativo' | 'resolvido' | 'arquivado'
+        | "novo"
+        | "avaliacao_agendada"
+        | "nao_compareceu"
+        | "avaliacao_realizada"
+        | "proposta_enviada"
+        | "fechado"
+        | "perdido"
+      management_action_status:
+        | "pendente"
+        | "em_andamento"
+        | "concluida"
+        | "cancelada"
+      management_item_status: "ativo" | "resolvido" | "arquivado"
       management_item_type:
-        | 'feedback'
-        | 'nota_privada_gestao'
-        | 'decisao_posse'
-        | 'conteudo_estrategico'
-        | 'instrucao_funcao'
-        | 'reconhecimento'
-        | 'plano_desenvolvimento'
+        | "feedback"
+        | "nota_privada_gestao"
+        | "decisao_posse"
+        | "conteudo_estrategico"
+        | "instrucao_funcao"
+        | "reconhecimento"
+        | "plano_desenvolvimento"
       management_visibility_level:
-        | 'OWNER_ONLY'
-        | 'PRIVATE_MANAGEMENT'
-        | 'SHARED_WITH_EMPLOYEE'
-        | 'FUNCTION_VISIBLE'
-      org_role_type: 'OWNER'
-      recurrence_type: 'pontual' | 'diaria' | 'semanal' | 'mensal' | 'data_especifica'
-      treatment_status: 'em_andamento' | 'concluido' | 'cancelado'
+        | "OWNER_ONLY"
+        | "PRIVATE_MANAGEMENT"
+        | "SHARED_WITH_EMPLOYEE"
+        | "FUNCTION_VISIBLE"
+      org_role_type: "OWNER"
+      recurrence_type:
+        | "pontual"
+        | "diaria"
+        | "semanal"
+        | "mensal"
+        | "data_especifica"
+      treatment_status: "em_andamento" | "concluido" | "cancelado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1182,31 +1274,33 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
-    : never = never,
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
-    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -1215,23 +1309,23 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -1240,23 +1334,23 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
+    | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -1265,91 +1359,109 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema['Enums']
+    | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
-    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema['CompositeTypes']
+    | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
-    : never = never,
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
-    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
   public: {
     Enums: {
-      agenda_item_status: ['aberto', 'concluido', 'cancelado'],
-      agenda_item_type: ['tarefa', 'compromisso', 'follow_up', 'pos_venda', 'pendencia'],
-      exception_severity: ['baixa', 'media', 'alta', 'critica'],
-      exception_status: ['aberta', 'reconhecida', 'decidida', 'resolvida'],
+      agenda_item_status: ["aberto", "concluido", "cancelado"],
+      agenda_item_type: [
+        "tarefa",
+        "compromisso",
+        "follow_up",
+        "pos_venda",
+        "pendencia",
+      ],
+      exception_severity: ["baixa", "media", "alta", "critica"],
+      exception_status: ["aberta", "reconhecida", "decidida", "resolvida"],
       exception_type: [
-        'tarefa_atrasada',
-        'ocorrencia_perdida',
-        'lead_sem_followup',
-        'falhas_recorrentes',
-        'outro_desvio',
+        "tarefa_atrasada",
+        "ocorrencia_perdida",
+        "lead_sem_followup",
+        "falhas_recorrentes",
+        "outro_desvio",
       ],
       lead_origin: [
-        'indicacao',
-        'meta_ads',
-        'google',
-        'organico',
-        'reativacao',
-        'campanha',
-        'parceiro',
-        'outros',
+        "indicacao",
+        "meta_ads",
+        "google",
+        "organico",
+        "reativacao",
+        "campanha",
+        "parceiro",
+        "outros",
       ],
       lead_stage: [
-        'novo',
-        'avaliacao_agendada',
-        'nao_compareceu',
-        'avaliacao_realizada',
-        'proposta_enviada',
-        'fechado',
-        'perdido',
+        "novo",
+        "avaliacao_agendada",
+        "nao_compareceu",
+        "avaliacao_realizada",
+        "proposta_enviada",
+        "fechado",
+        "perdido",
       ],
-      management_action_status: ['pendente', 'em_andamento', 'concluida', 'cancelada'],
-      management_item_status: ['ativo', 'resolvido', 'arquivado'],
+      management_action_status: [
+        "pendente",
+        "em_andamento",
+        "concluida",
+        "cancelada",
+      ],
+      management_item_status: ["ativo", "resolvido", "arquivado"],
       management_item_type: [
-        'feedback',
-        'nota_privada_gestao',
-        'decisao_posse',
-        'conteudo_estrategico',
-        'instrucao_funcao',
-        'reconhecimento',
-        'plano_desenvolvimento',
+        "feedback",
+        "nota_privada_gestao",
+        "decisao_posse",
+        "conteudo_estrategico",
+        "instrucao_funcao",
+        "reconhecimento",
+        "plano_desenvolvimento",
       ],
       management_visibility_level: [
-        'OWNER_ONLY',
-        'PRIVATE_MANAGEMENT',
-        'SHARED_WITH_EMPLOYEE',
-        'FUNCTION_VISIBLE',
+        "OWNER_ONLY",
+        "PRIVATE_MANAGEMENT",
+        "SHARED_WITH_EMPLOYEE",
+        "FUNCTION_VISIBLE",
       ],
-      org_role_type: ['OWNER'],
-      recurrence_type: ['pontual', 'diaria', 'semanal', 'mensal', 'data_especifica'],
-      treatment_status: ['em_andamento', 'concluido', 'cancelado'],
+      org_role_type: ["OWNER"],
+      recurrence_type: [
+        "pontual",
+        "diaria",
+        "semanal",
+        "mensal",
+        "data_especifica",
+      ],
+      treatment_status: ["em_andamento", "concluido", "cancelado"],
     },
   },
 } as const
+
