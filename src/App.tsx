@@ -17,6 +17,7 @@ import Funcoes from './pages/Funcoes'
 import Colaboradores from './pages/Colaboradores'
 import Dentistas from './pages/Dentistas'
 import CrcWorkspace from './pages/CrcWorkspace'
+import Gestao from './pages/Gestao'
 import NotFound from './pages/NotFound'
 
 const App = () => (
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/crm/leads/:id" element={<LeadDetail />} />
             <Route path="/crm/scripts" element={<Scripts />} />
             <Route path="/cadastros/funcoes" element={<Funcoes />} />
+            <Route path="/gestao" element={<Gestao />} />
             <Route path="/cadastros/colaboradores" element={<Colaboradores />} />
             <Route path="/cadastros/dentistas" element={<Dentistas />} />
 

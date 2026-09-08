@@ -29,6 +29,7 @@ export default function Layout() {
     if (path.startsWith('/dashboard')) return 'ERP — Dashboard'
     if (path.startsWith('/agenda')) return 'ERP — Agenda Unificada'
     if (path.startsWith('/tarefas')) return 'ERP — Modelos de Tarefas'
+    if (path.startsWith('/gestao')) return 'Gestão — Gestão Clínica & Ações'
     if (path.startsWith('/crc')) return 'CRM — Central do CRC'
     if (path.startsWith('/crm/leads/')) return 'CRM — Detalhe do Lead'
     if (path.startsWith('/crm/scripts')) return 'CRM — Scripts de Atendimento'
@@ -52,6 +53,18 @@ export default function Layout() {
     currentDateFormatted.charAt(0).toUpperCase() + currentDateFormatted.slice(1)
 
   const { isOwner, switchRoleContext } = useApp()
+
+  // Verificação segura de visibilidade do menu Gestão:
+  // Visível a OWNER e a quem exerce a função Gerência (por roleName ou allowedRoleIds)
+  const isManagerRole = Boolean(
+    currentUser?.roleName?.toLowerCase().includes('gerência') ||
+    currentUser?.roleName?.toLowerCase().includes('gerencia') ||
+    roles.some(
+      (r) =>
+        r.name.toLowerCase().includes('gerência') && currentUser?.allowedRoleIds?.includes(r.id),
+    ),
+  )
+  const canAccessManagement = isOwner || isManagerRole
 
   const handleLogout = () => {
     logout()
@@ -85,6 +98,14 @@ export default function Layout() {
         { label: 'Tarefas', path: '/tarefas', icon: CheckSquare },
       ],
     },
+    ...(canAccessManagement
+      ? [
+          {
+            group: 'Gestão',
+            items: [{ label: 'Gestão Clínica', path: '/gestao', icon: Sparkles }],
+          },
+        ]
+      : []),
     {
       group: 'CRM',
       items: [

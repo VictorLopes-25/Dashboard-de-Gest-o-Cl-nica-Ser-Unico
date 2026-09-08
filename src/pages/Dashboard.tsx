@@ -1,7 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '@/context/AppContext'
 import { TaskModal } from '@/components/TaskModal'
+import {
+  fetchManagementItems,
+  acknowledgeManagementItem,
+  mapDbManagementItemToUi,
+} from '@/services/managementService'
 import {
   CheckCircle2,
   AlertTriangle,
@@ -11,11 +16,17 @@ import {
   TrendingUp,
   Sparkles,
   Circle,
+  MessageSquare,
+  Building2,
+  UserCheck,
+  Check,
+  Clock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import type { AgendaItem } from '@/types'
+import { useToast } from '@/hooks/use-toast'
+import type { AgendaItem, ManagementItem } from '@/types'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -30,8 +41,12 @@ export default function Dashboard() {
     toggleTaskCompletion,
   } = useApp()
 
+  const { toast } = useToast()
   const [taskModalOpen, setTaskModalOpen] = useState(false)
   const [weeklyItems, setWeeklyItems] = useState<AgendaItem[]>([])
+  const [colabFeedbacks, setColabFeedbacks] = useState<ManagementItem[]>([])
+  const [feedbacksLoading, setFeedbacksLoading] = useState(true)
+  const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null)
 
   // Data atual no formato ISO YYYY-MM-DD local
   const todayStr = useMemo(() => {
@@ -69,6 +84,65 @@ export default function Dashboard() {
       mounted = false
     }
   }, [weekStartStr, todayStr, loadAgendaWindow, agendaItems])
+
+  // Carregar Comunicados e Feedbacks direcionados ao colaborador / função
+  const loadColabFeedbacks = useCallback(async () => {
+    if (!currentUser) return
+    setFeedbacksLoading(true)
+    try {
+      const dbItems = await fetchManagementItems()
+      const peopleMap = new Map(collaborators.map((c) => [c.id, c.name]))
+      const functionsMap = new Map(roles.map((r) => [r.id, r.name]))
+      const mapped = dbItems.map((i) => mapDbManagementItemToUi(i, peopleMap, functionsMap))
+
+      // Filtrar para home do colaborador: SHARED_WITH_EMPLOYEE dele OU FUNCTION_VISIBLE da sua função
+      const relevant = mapped.filter((item) => {
+        if (item.visibilityLevel === 'SHARED_WITH_EMPLOYEE') {
+          return item.targetPersonId === currentUser.id
+        }
+        if (item.visibilityLevel === 'FUNCTION_VISIBLE') {
+          return (
+            item.targetFunctionId === currentUser.roleId ||
+            (currentUser.allowedRoleIds &&
+              item.targetFunctionId &&
+              currentUser.allowedRoleIds.includes(item.targetFunctionId))
+          )
+        }
+        return false
+      })
+
+      setColabFeedbacks(relevant)
+    } catch (err) {
+      console.error('Falha ao carregar comunicados/feedbacks do colaborador:', err)
+    } finally {
+      setFeedbacksLoading(false)
+    }
+  }, [currentUser, collaborators, roles])
+
+  useEffect(() => {
+    loadColabFeedbacks()
+  }, [loadColabFeedbacks])
+
+  // Ação de confirmar leitura / reconhecimento de feedback pelo colaborador
+  const handleAcknowledge = async (itemId: string) => {
+    setAcknowledgingId(itemId)
+    try {
+      await acknowledgeManagementItem(itemId)
+      toast({
+        title: 'Leitura confirmada',
+        description: 'Você confirmou a leitura e reconhecimento deste feedback.',
+      })
+      await loadColabFeedbacks()
+    } catch (err: any) {
+      toast({
+        title: 'Falha ao confirmar leitura',
+        description: err?.message || 'Erro inesperado.',
+        variant: 'destructive',
+      })
+    } finally {
+      setAcknowledgingId(null)
+    }
+  }
 
   // Saudação com base no horário
   const currentHour = new Date().getHours()
@@ -633,6 +707,126 @@ export default function Dashboard() {
             })}
           </div>
         </TooltipProvider>
+      </div>
+
+      {/* SEÇÃO STAGE 4B: Comunicados e Feedbacks da Gestão (Visível ao colaborador) */}
+      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
+              <MessageSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                Comunicados e Feedbacks da Gestão
+              </h2>
+              <p className="text-xs text-slate-500">
+                Instruções operacionais da sua função e feedbacks individuais direcionados a você
+              </p>
+            </div>
+          </div>
+
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+            {colabFeedbacks.filter((f) => !f.acknowledgedAt).length} não lidos
+          </span>
+        </div>
+
+        <div className="mt-4">
+          {feedbacksLoading ? (
+            <div className="py-8 text-center text-xs text-slate-400">
+              Carregando comunicados e feedbacks...
+            </div>
+          ) : colabFeedbacks.length === 0 ? (
+            <div className="py-8 text-center">
+              <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 mx-auto flex items-center justify-center mb-2">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <p className="text-sm font-semibold text-slate-700">
+                Nenhum comunicado ou feedback pendente.
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Você está em dia com todas as orientações da gestão.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {colabFeedbacks.map((item) => {
+                const isAcknowledged = !!item.acknowledgedAt
+                const isShared = item.visibilityLevel === 'SHARED_WITH_EMPLOYEE'
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-4 rounded-xl border transition flex flex-col justify-between ${
+                      isAcknowledged
+                        ? 'bg-slate-50/60 border-slate-200'
+                        : 'bg-white border-teal-200 shadow-2xs hover:border-teal-300'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isShared
+                              ? 'bg-teal-50 text-teal-800 border border-teal-200'
+                              : 'bg-blue-50 text-blue-800 border border-blue-200'
+                          }`}
+                        >
+                          {isShared ? (
+                            <>
+                              <UserCheck className="w-3 h-3" /> Feedback Individual
+                            </>
+                          ) : (
+                            <>
+                              <Building2 className="w-3 h-3" /> Instrução da Função
+                            </>
+                          )}
+                        </span>
+
+                        <span className="text-[11px] text-slate-400">
+                          {new Date(item.createdAt).toLocaleDateString('pt-BR')}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 space-y-1.5">
+                        <h3 className="text-sm font-bold text-slate-800 leading-snug">
+                          {item.title}
+                        </h3>
+                        <p className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">
+                          {item.content}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400">
+                        Por: <strong className="text-slate-600">{item.createdByName}</strong>
+                      </span>
+
+                      {/* Botão de Reconhecimento / Status */}
+                      {isAcknowledged ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          <Check className="w-3 h-3 text-emerald-600" />
+                          Confirmado em {new Date(item.acknowledgedAt!).toLocaleDateString('pt-BR')}
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => handleAcknowledge(item.id)}
+                          disabled={acknowledgingId === item.id}
+                          className="h-7 text-xs bg-teal-700 hover:bg-teal-800 text-white font-medium"
+                        >
+                          <Check className="w-3 h-3 mr-1" />
+                          {acknowledgingId === item.id ? 'Confirmando...' : 'Confirmar leitura'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Floating Action Button for Mobile */}

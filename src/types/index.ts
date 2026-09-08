@@ -227,3 +227,67 @@ export type DentalSpecialty =
   | 'Cirurgia'
   | 'Clareamento'
   | 'Outro'
+
+// -------------------------------------------------------------------------
+// STAGE 4B: MANAGEMENT CORE TYPES
+// -------------------------------------------------------------------------
+
+export type ManagementVisibilityLevel =
+  | 'OWNER_ONLY'
+  | 'PRIVATE_MANAGEMENT'
+  | 'SHARED_WITH_EMPLOYEE'
+  | 'FUNCTION_VISIBLE'
+
+export type ManagementItemType =
+  | 'feedback'
+  | 'nota_privada_gestao'
+  | 'decisao_posse'
+  | 'conteudo_estrategico'
+  | 'instrucao_funcao'
+  | 'reconhecimento'
+  | 'plano_desenvolvimento'
+
+export type ManagementItemStatus = 'ativo' | 'resolvido' | 'arquivado'
+
+export type ManagementActionStatus = 'pendente' | 'em_andamento' | 'concluida' | 'cancelada'
+
+export interface ManagementItem {
+  id: string
+  organizationId: string
+  title: string
+  content: string
+  type: ManagementItemType
+  visibilityLevel: ManagementVisibilityLevel
+  status: ManagementItemStatus
+  targetPersonId?: string | null
+  targetPersonName?: string | null
+  targetFunctionId?: string | null
+  targetFunctionName?: string | null
+  createdByPersonId?: string | null
+  createdByName?: string | null
+  acknowledgedAt?: string | null
+  acknowledgedByPersonId?: string | null
+  acknowledgedByName?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ManagementAction {
+  id: string
+  organizationId: string
+  title: string
+  description: string
+  status: ManagementActionStatus
+  responsiblePersonId?: string | null
+  responsiblePersonName?: string | null
+  responsibleFunctionId?: string | null
+  responsibleFunctionName?: string | null
+  dueDate?: string | null
+  originItemId?: string | null
+  originItemTitle?: string | null
+  createdByPersonId?: string | null
+  createdByName?: string | null
+  completedAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
