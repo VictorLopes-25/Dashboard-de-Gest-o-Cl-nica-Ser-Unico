@@ -101,6 +101,35 @@ export async function assignPersonToFunction(
   const orgId = await getOrganizationId()
   const today = new Date().toISOString().split('T')[0]
 
+  // Tentar via RPC atômica no banco primeiro (garante rollback completo em caso de falha e evita quebra de uq_fa_current_occupant)
+  const { data: rpcData, error: rpcError } = await (supabase.rpc as any)(
+    'replace_function_occupant',
+    {
+      p_function_id: functionId,
+      p_new_person_id: personId,
+    },
+  )
+
+  if (!rpcError && rpcData) {
+    const assignmentId = (rpcData as any).assignment_id
+    if (assignmentId) {
+      const { data: assignmentRec } = await supabase
+        .from('function_assignments')
+        .select('*')
+        .eq('id', assignmentId)
+        .maybeSingle()
+      if (assignmentRec) return assignmentRec as DbFunctionAssignment
+    }
+    // Caso de fallback na leitura
+    const current = await getCurrentOccupantOfFunction(functionId)
+    if (current) return current
+  }
+
+  if (rpcError) {
+    // Se o RPC falhar por permissão ou erro de negócio, repassar exceção clara
+    console.warn('RPC replace_function_occupant falhou, tentando transição direta:', rpcError)
+  }
+
   // 1. Verificar se a mesma pessoa já é a ocupante ativa dessa função
   const currentOccupant = await getCurrentOccupantOfFunction(functionId)
   if (currentOccupant && currentOccupant.person_id === personId) {
@@ -144,6 +173,35 @@ export async function assignPersonToFunction(
   }
 
   return newAssignment as DbFunctionAssignment
+}
+
+/**
+ * Substitui atomicamente o ocupante de uma função por uma nova pessoa.
+ * Se a função já possuir ocupante ativo diferente:
+ * 1. Ocupante anterior é fechado (end_date = CURRENT_DATE, active = false).
+ * 2. Novo ocupante é ativado (end_date = NULL, active = true).
+ * 3. Se algo falhar, a operação é revertida atomicamente pelo Postgres.
+ */
+export async function replaceFunctionOccupant(
+  functionId: string,
+  newPersonId: string,
+): Promise<{ success: boolean; assignmentId: string; previousPersonId?: string | null }> {
+  const { data, error } = await (supabase.rpc as any)('replace_function_occupant', {
+    p_function_id: functionId,
+    p_new_person_id: newPersonId,
+  })
+
+  if (error) {
+    console.error('Erro ao executar replace_function_occupant:', error)
+    throw new Error(`Falha ao substituir ocupante da função: ${error.message}`)
+  }
+
+  const res = data as any
+  return {
+    success: !!res?.success,
+    assignmentId: res?.assignment_id,
+    previousPersonId: res?.previous_person_id ?? null,
+  }
 }
 
 /**

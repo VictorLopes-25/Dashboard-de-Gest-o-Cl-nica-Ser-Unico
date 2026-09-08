@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { useApp } from '@/context/AppContext'
 import { Collaborator } from '@/types'
 import { formatPhoneMask } from '@/components/LeadModal'
+import { toast } from '@/hooks/use-toast'
 import {
   UserCheck,
   Plus,
@@ -126,19 +127,33 @@ export default function Colaboradores() {
           roleIds: selectedRoleIds,
           isActive,
         })
+        toast({
+          title: 'Colaborador atualizado',
+          description: `Os dados de "${name.trim()}" foram persistidos no Supabase com sucesso.`,
+        })
       } else {
-        await addCollaborator({
+        const created = await addCollaborator({
           name: name.trim(),
           phone: phone.trim(),
           email: email.trim(),
           roleIds: selectedRoleIds,
           isActive,
         })
+        toast({
+          title: 'Colaborador cadastrado com sucesso',
+          description: `"${created?.name || name.trim()}" persistido em public.people no Supabase.`,
+        })
       }
 
       setModalOpen(false)
     } catch (err: any) {
-      setSubmitError(err?.message || 'Falha ao salvar colaborador no banco de dados.')
+      const msg = err?.message || 'Falha ao salvar colaborador no banco de dados.'
+      setSubmitError(msg)
+      toast({
+        title: 'Erro ao persistir colaborador',
+        description: msg,
+        variant: 'destructive',
+      })
     } finally {
       setSubmitting(false)
     }
@@ -148,9 +163,18 @@ export default function Colaboradores() {
     if (colabToDelete) {
       try {
         await deleteCollaborator(colabToDelete.id)
+        toast({
+          title: 'Colaborador desativado',
+          description: `"${colabToDelete.name}" foi inativado e suas funções foram encerradas no Supabase mantendo histórico.`,
+        })
         setColabToDelete(null)
       } catch (err: any) {
-        alert(`Erro ao remover colaborador: ${err?.message || 'Falha na operação'}`)
+        const msg = err?.message || 'Falha na operação'
+        toast({
+          title: 'Erro ao desativar colaborador',
+          description: msg,
+          variant: 'destructive',
+        })
       }
     }
   }

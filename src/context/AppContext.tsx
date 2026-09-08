@@ -35,6 +35,7 @@ import {
 import {
   fetchActiveAssignments,
   syncPersonFunctions,
+  replaceFunctionOccupant,
   type DbFunctionAssignment,
 } from '@/services/functionAssignmentsService'
 import { fetchAreas, type DbArea } from '@/services/areasService'
@@ -390,6 +391,7 @@ interface AppContextType {
   addRole: (role: Omit<Role, 'id'>) => Promise<Role | null>
   updateRole: (id: string, updates: Partial<Role>) => Promise<void>
   deleteRole: (id: string) => Promise<void>
+  assignRoleOccupant: (functionId: string, personId: string) => Promise<void>
 
   // CRUD Colaboradores
   addCollaborator: (colab: Omit<Collaborator, 'id'>) => Promise<Collaborator | null>
@@ -771,6 +773,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // CRUD — Colaboradores (public.people + public.function_assignments)
   // ----------------------------------------------------------------
 
+  const assignRoleOccupant = async (functionId: string, personId: string): Promise<void> => {
+    try {
+      await replaceFunctionOccupant(functionId, personId)
+      // Atualização canônica após confirmação do Supabase
+      await refreshData()
+    } catch (err) {
+      console.error('Falha ao atribuir ocupante da função:', err)
+      throw err
+    }
+  }
+
   const addCollaborator = async (
     colabData: Omit<Collaborator, 'id'>,
   ): Promise<Collaborator | null> => {
@@ -786,7 +799,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await syncPersonFunctions(createdPerson.id, colabData.roleIds)
       }
 
-      const newColab: Collaborator = {
+      // 3. Atualizar dados canônicos diretamente do Supabase antes de retornar
+      await refreshData()
+
+      const createdItem: Collaborator = {
         id: createdPerson.id,
         name: createdPerson.name,
         email: colabData.email || '',
@@ -794,9 +810,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         roleIds: colabData.roleIds || [],
         isActive: createdPerson.active,
       }
-
-      setCollaborators((prev) => [...prev, newColab])
-      return newColab
+      return createdItem
     } catch (err) {
       console.error('Falha ao cadastrar colaborador no Supabase:', err)
       throw err
@@ -818,7 +832,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await syncPersonFunctions(id, updates.roleIds)
       }
 
-      setCollaborators((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)))
+      // 3. Recarrega dados canônicos diretamente do Supabase
+      await refreshData()
     } catch (err) {
       console.error('Falha ao atualizar colaborador no Supabase:', err)
       throw err
@@ -830,9 +845,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await syncPersonFunctions(id, [])
       await setPersonActive(id, false)
-      setCollaborators((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, isActive: false, roleIds: [] } : c)),
-      )
+      await refreshData()
     } catch (err) {
       console.error('Falha ao desativar colaborador no Supabase:', err)
       throw err
@@ -1516,6 +1529,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addRole,
         updateRole,
         deleteRole,
+        assignRoleOccupant,
         addCollaborator,
         updateCollaborator,
         deleteCollaborator,

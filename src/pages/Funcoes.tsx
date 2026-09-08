@@ -1,16 +1,20 @@
 import React, { useState } from 'react'
 import { useApp } from '@/context/AppContext'
-import { Role } from '@/types'
+import { Role, Collaborator } from '@/types'
+import { toast } from '@/hooks/use-toast'
 import {
   BadgeCheck,
   Plus,
   Pencil,
   Trash2,
   Users,
+  UserCheck,
   CheckSquare,
   Shield,
   Layers,
   Sparkles,
+  UserPlus,
+  AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -101,11 +105,27 @@ const PRESET_COLORS = [
 ]
 
 export default function Funcoes() {
-  const { roles, collaborators, tasks, addRole, updateRole, deleteRole, isOwner } = useApp()
+  const {
+    roles,
+    collaborators,
+    tasks,
+    addRole,
+    updateRole,
+    deleteRole,
+    assignRoleOccupant,
+    isOwner,
+  } = useApp()
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null)
+
+  // Modal Alterar/Substituir Ocupante
+  const [occupantModalOpen, setOccupantModalOpen] = useState(false)
+  const [targetRoleForOccupant, setTargetRoleForOccupant] = useState<Role | null>(null)
+  const [selectedPersonId, setSelectedPersonId] = useState<string>('')
+  const [replacementConfirmOpen, setReplacementConfirmOpen] = useState(false)
+  const [occupantSubmitting, setOccupantSubmitting] = useState(false)
 
   // Form
   const [name, setName] = useState('')
@@ -179,10 +199,89 @@ export default function Funcoes() {
     if (roleToDelete) {
       try {
         await deleteRole(roleToDelete.id)
+        toast({
+          title: 'Função desativada',
+          description: `A função "${roleToDelete.name}" foi desativada com sucesso.`,
+        })
         setRoleToDelete(null)
       } catch (err: any) {
-        alert(`Erro ao desativar função: ${err?.message || 'Falha na operação'}`)
+        const msg = err?.message || 'Falha na operação'
+        toast({
+          title: 'Erro ao desativar função',
+          description: msg,
+          variant: 'destructive',
+        })
       }
+    }
+  }
+
+  const handleOpenOccupantModal = (role: Role) => {
+    setTargetRoleForOccupant(role)
+    const currentOccupants = collaborators.filter((c) => c.isActive && c.roleIds.includes(role.id))
+    setSelectedPersonId(currentOccupants[0]?.id || '')
+    setOccupantModalOpen(true)
+  }
+
+  const handleRequestAssignOccupant = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!targetRoleForOccupant || !selectedPersonId) {
+      toast({
+        title: 'Selecione um colaborador',
+        description: 'É necessário selecionar um colaborador cadastrado para assumir a função.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const currentOccupants = collaborators.filter(
+      (c) => c.isActive && c.roleIds.includes(targetRoleForOccupant.id),
+    )
+    const currentOccupant = currentOccupants[0]
+
+    // Se já for o mesmo ocupante
+    if (currentOccupant && currentOccupant.id === selectedPersonId) {
+      toast({
+        title: 'Ocupante inalterado',
+        description: `${currentOccupant.name} já ocupa atualmente a função ${targetRoleForOccupant.name}.`,
+      })
+      setOccupantModalOpen(false)
+      return
+    }
+
+    // Se houver ocupante atual diferente, exige confirmação explícita do OWNER
+    if (currentOccupant) {
+      setReplacementConfirmOpen(true)
+      return
+    }
+
+    // Se não há ocupante anterior, atribui diretamente
+    executeAssignment()
+  }
+
+  const executeAssignment = async () => {
+    if (!targetRoleForOccupant || !selectedPersonId) return
+
+    setOccupantSubmitting(true)
+    try {
+      await assignRoleOccupant(targetRoleForOccupant.id, selectedPersonId)
+      const newOccupant = collaborators.find((c) => c.id === selectedPersonId)
+
+      toast({
+        title: 'Ocupante atribuído com sucesso',
+        description: `${newOccupant?.name || 'Colaborador'} agora é o ocupante atual de ${targetRoleForOccupant.name}.`,
+      })
+
+      setReplacementConfirmOpen(false)
+      setOccupantModalOpen(false)
+    } catch (err: any) {
+      const msg = err?.message || 'Falha ao atribuir ocupante no Supabase.'
+      toast({
+        title: 'Erro na atribuição de ocupante',
+        description: msg,
+        variant: 'destructive',
+      })
+    } finally {
+      setOccupantSubmitting(false)
     }
   }
 
@@ -282,23 +381,65 @@ export default function Funcoes() {
                 </p>
               </div>
 
+              {/* Occupant Section & Philosophy Header */}
+              <div className="pt-3 border-t border-slate-100 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Ocupante Atual:
+                  </span>
+                  {isOwner && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenOccupantModal(role)}
+                      className="h-6 text-[11px] px-2 py-0 text-teal-700 hover:text-teal-800 border-teal-200 hover:bg-teal-50"
+                    >
+                      <UserCheck className="w-3 h-3 mr-1" />
+                      Alterar ocupante
+                    </Button>
+                  )}
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-between">
+                  {linkedCollaborators.length > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-[10px]">
+                        {linkedCollaborators[0].name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-900 leading-tight">
+                          {linkedCollaborators[0].name}
+                        </p>
+                        {linkedCollaborators.length > 1 && (
+                          <p className="text-[10px] text-slate-400">
+                            +{linkedCollaborators.length - 1} co-atribuído(s)
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-xs font-medium text-slate-400 italic">Não atribuído</span>
+                  )}
+                </div>
+              </div>
+
               {/* Stats Footer */}
-              <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-slate-400" />
+              <div className="pt-2 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
+                <div className="p-2 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center gap-2">
+                  <Users className="w-3.5 h-3.5 text-slate-400" />
                   <div>
                     <span className="font-bold text-slate-800">{linkedCollaborators.length}</span>
                     <p className="text-[10px] text-slate-500">Colaboradores</p>
                   </div>
                 </div>
 
-                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-2">
-                  <CheckSquare className="w-4 h-4 text-slate-400" />
+                <div className="p-2 rounded-xl bg-slate-50/70 border border-slate-100 flex items-center gap-2">
+                  <CheckSquare className="w-3.5 h-3.5 text-slate-400" />
                   <div>
                     <span className="font-bold text-slate-800">
-                      {roleTasks.length} ({pendingTasks.length} pendentes)
+                      {roleTasks.length} ({pendingTasks.length} pend.)
                     </span>
-                    <p className="text-[10px] text-slate-500">Tarefas cadastradas</p>
+                    <p className="text-[10px] text-slate-500">Tarefas da função</p>
                   </div>
                 </div>
               </div>
@@ -306,6 +447,126 @@ export default function Funcoes() {
           )
         })}
       </div>
+
+      {/* Modal: Alterar / Atribuir Ocupante da Função (OWNER ONLY) */}
+      <Dialog open={occupantModalOpen} onOpenChange={setOccupantModalOpen}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-teal-700" />
+              <span>Atribuir Ocupante — {targetRoleForOccupant?.name}</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleRequestAssignOccupant} className="space-y-4 py-2">
+            <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl text-xs text-teal-900 space-y-1">
+              <p className="font-semibold">Regra de Posse & Função:</p>
+              <p>
+                A <strong>FUNÇÃO</strong> é a estrutura organizacional permanente. O colaborador é o
+                ocupante temporário. Rotinas, protocolos e tarefas permanecem na função mesmo quando
+                o colaborador é substituído.
+              </p>
+            </div>
+
+            {targetRoleForOccupant && (
+              <div className="text-xs text-slate-600 space-y-1">
+                <p>
+                  <strong>Ocupante atual:</strong>{' '}
+                  {collaborators.find(
+                    (c) => c.isActive && c.roleIds.includes(targetRoleForOccupant.id),
+                  )?.name || <span className="text-slate-400 italic">Nenhum ocupante ativo</span>}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">
+                Selecione o novo ocupante da função <span className="text-red-500">*</span>
+              </Label>
+              <select
+                value={selectedPersonId}
+                onChange={(e) => setSelectedPersonId(e.target.value)}
+                className="w-full h-10 px-3 text-sm rounded-md border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-teal-600"
+              >
+                <option value="">Selecione um colaborador cadastrado...</option>
+                {collaborators
+                  .filter((c) => c.isActive)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{' '}
+                      {c.roleIds.includes(targetRoleForOccupant?.id || '') ? '(Atual)' : ''}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-[11px] text-slate-400">
+                Apenas colaboradores ativos cadastrados em public.people podem ser atribuídos.
+              </p>
+            </div>
+
+            <DialogFooter className="gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setOccupantModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={occupantSubmitting || !selectedPersonId}
+                className="bg-teal-700 hover:bg-teal-800 text-white font-medium"
+              >
+                {occupantSubmitting ? 'Gravando...' : 'Confirmar Ocupante'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Alert Dialog: Confirmação de Substituição Atômica */}
+      <AlertDialog
+        open={replacementConfirmOpen}
+        onOpenChange={(open) => !open && setReplacementConfirmOpen(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+              Substituir Ocupante da Função?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2 pt-2 text-slate-700">
+              <p>
+                <strong>
+                  {
+                    collaborators.find(
+                      (c) => c.isActive && c.roleIds.includes(targetRoleForOccupant?.id || ''),
+                    )?.name
+                  }
+                </strong>{' '}
+                ocupa atualmente a função <strong>{targetRoleForOccupant?.name}</strong>.
+              </p>
+              <p>
+                Deseja substituí-lo(a) por{' '}
+                <strong>{collaborators.find((c) => c.id === selectedPersonId)?.name}</strong>?
+              </p>
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600">
+                <strong>Garantia Histórica:</strong> O histórico de atribuição anterior será
+                preservado com data de encerramento. Tarefas e rotinas da função não serão perdidas
+                nem duplicadas.
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={occupantSubmitting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                executeAssignment()
+              }}
+              disabled={occupantSubmitting}
+              className="bg-teal-700 hover:bg-teal-800 text-white"
+            >
+              {occupantSubmitting ? 'Substituindo...' : 'Confirmar Substituição'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modal: Create / Edit Role */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
