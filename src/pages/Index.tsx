@@ -55,10 +55,10 @@ export default function Index() {
 
   // Redireciona para /dashboard se já estiver autenticado com pessoa ativa
   useEffect(() => {
-    if (user && resolvedPerson?.active) {
+    if ((user && resolvedPerson?.active) || currentUser) {
       navigate('/dashboard', { replace: true })
     }
-  }, [user, resolvedPerson, navigate])
+  }, [user, resolvedPerson, currentUser, navigate])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -267,14 +267,16 @@ export default function Index() {
               <Loader2 className="w-8 h-8 animate-spin text-teal-700" />
               <p className="text-xs">Verificando credenciais e permissões...</p>
             </div>
-          ) : user && resolvedPerson?.active ? (
+          ) : (user && resolvedPerson?.active) || currentUser ? (
             <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
               <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center shadow-xs">
                 <Loader2 className="w-6 h-6 animate-spin text-teal-700" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-800">Autenticado com sucesso</h3>
-                <p className="text-xs text-slate-500 mt-1">Redirecionando para o Dashboard...</p>
+                <h3 className="text-base font-bold text-slate-800">Entrando...</h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Autenticação confirmada. Redirecionando para o painel institucional...
+                </p>
               </div>
             </div>
           ) : isInactivePerson ? (
