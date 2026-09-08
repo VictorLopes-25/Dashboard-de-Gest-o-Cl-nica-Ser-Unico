@@ -187,8 +187,12 @@ export default function Gestao() {
   const { isOwner, roles, collaborators, agendaItems, leads, tasks } = useApp()
   const { toast } = useToast()
 
-  // Seções da tela operacional
-  // Primary tabs: 'attention' | 'pending' | 'actions' | 'feedback' | 'rules'
+  // Seções primárias da tela operacional na ordem requerida:
+  // 1. PRECISA DA SUA ATENÇÃO ('attention')
+  // 2. PENDÊNCIAS DE HOJE ('pending')
+  // 3. AÇÕES DE GESTÃO ('actions')
+  // 4. FEEDBACKS E ORIENTAÇÕES ('feedback')
+  // Regras de Gestão em disclosure secundário ('rules')
   const [activeTab, setActiveTab] = useState<
     'attention' | 'pending' | 'actions' | 'feedback' | 'rules'
   >('attention')
@@ -435,6 +439,15 @@ export default function Gestao() {
 
   const handleUpdateThreshold = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isOwner) {
+      toast({
+        title: 'Acesso restrito',
+        description: 'Apenas o proprietário (OWNER) pode alterar as regras de gestão.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setSubmitting(true)
     try {
       await updateThresholdConfig(editingThresholdKey, Number(editingThresholdVal))
@@ -1550,18 +1563,30 @@ export default function Gestao() {
       {/* SEÇÃO SECUNDÁRIA: REGRAS DE GESTÃO (DISCLOSURE PROGRESSIVO) */}
       {activeTab === 'rules' && (
         <div className="space-y-4">
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-start gap-2.5">
-            <Info className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-semibold text-slate-900">
-                Regras de Acompanhamento e Prazos da Clínica
-              </p>
-              <p className="leading-relaxed">
-                Estas configurações determinam quando uma pendência da equipe deve ser apresentada à
-                gerência para decisão, permitindo que a rotina diária flua sem ruídos
-                desnecessários.
-              </p>
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-start justify-between gap-3 flex-wrap">
+            <div className="flex items-start gap-2.5 max-w-2xl">
+              <Info className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold text-slate-900">
+                  Regras de Acompanhamento e Prazos da Clínica
+                </p>
+                <p className="leading-relaxed">
+                  Estas configurações determinam quando uma pendência da equipe deve ser apresentada
+                  à gerência para decisão, permitindo que a rotina diária flua sem ruídos
+                  desnecessários.
+                </p>
+              </div>
             </div>
+
+            {isOwner ? (
+              <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-300">
+                Ajuste restrito ao Proprietário (OWNER)
+              </span>
+            ) : (
+              <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                Modo Somente Leitura (Consulte o OWNER para alterar regras)
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1596,15 +1621,21 @@ export default function Gestao() {
                       Atualizado em {new Date(cfg.updatedAt).toLocaleDateString('pt-BR')}
                     </span>
 
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleOpenThresholdModal(cfg)}
-                      className="text-xs h-7 px-2.5 text-teal-800 border-teal-300 hover:bg-teal-50"
-                    >
-                      <Edit3 className="w-3 h-3 mr-1" />
-                      Ajustar regra
-                    </Button>
+                    {isOwner ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenThresholdModal(cfg)}
+                        className="text-xs h-7 px-2.5 text-teal-800 border-teal-300 hover:bg-teal-50"
+                      >
+                        <Edit3 className="w-3 h-3 mr-1" />
+                        Ajustar regra
+                      </Button>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic">
+                        Fixado pela Diretoria
+                      </span>
+                    )}
                   </div>
                 </div>
               )
