@@ -29,6 +29,7 @@ export default function Layout() {
     if (path.startsWith('/dashboard')) return 'ERP — Dashboard'
     if (path.startsWith('/agenda')) return 'ERP — Agenda Unificada'
     if (path.startsWith('/tarefas')) return 'ERP — Modelos de Tarefas'
+    if (path.startsWith('/crc')) return 'CRM — Central do CRC'
     if (path.startsWith('/crm/leads/')) return 'CRM — Detalhe do Lead'
     if (path.startsWith('/crm/scripts')) return 'CRM — Scripts de Atendimento'
     if (path.startsWith('/crm')) return 'CRM — Funil de Leads'
@@ -80,7 +81,8 @@ export default function Layout() {
     {
       group: 'CRM',
       items: [
-        { label: 'Leads', path: '/crm', icon: Users2 },
+        { label: 'Central do CRC', path: '/crc', icon: Users2 },
+        { label: 'Funil de Leads', path: '/crm', icon: LayoutGrid },
         { label: 'Scripts', path: '/crm/scripts', icon: FileText },
       ],
     },
@@ -137,7 +139,9 @@ export default function Layout() {
                 const isActive =
                   item.path === '/crm'
                     ? location.pathname === '/crm' || location.pathname.startsWith('/crm/leads')
-                    : location.pathname === item.path
+                    : item.path === '/crc'
+                      ? location.pathname === '/crc'
+                      : location.pathname === item.path
 
                 return (
                   <NavLink

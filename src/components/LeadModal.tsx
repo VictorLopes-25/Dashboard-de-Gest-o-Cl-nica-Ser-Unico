@@ -136,21 +136,28 @@ export const LeadModal: React.FC<LeadModalProps> = ({
   onOpenChange,
   defaultStage = 'novo',
 }) => {
-  const { addLead, collaborators, dentists, leads } = useApp()
+  const { addLead, collaborators, dentists, roles, leads } = useApp()
 
-  // Default responsible: Paula Rocha (CRC) if available
+  // Default responsible function: CRC if available
+  const crcRole = roles.find((r) => r.name.toLowerCase().includes('crc')) || roles[0]
+  const defaultFunctionId = crcRole ? crcRole.id : ''
+
+  // Default responsible person: Paula Rocha (CRC) if available
   const paulaColab = collaborators.find((c) => c.name.toLowerCase().includes('paula'))
   const defaultAssignedId = paulaColab ? paulaColab.id : collaborators[0]?.id || ''
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [origin, setOrigin] = useState<LeadOrigin>('meta_ads')
   const [referredByName, setReferredByName] = useState('')
   const [interest, setInterest] = useState<LeadInterest>('Implantes')
   const [stage, setStage] = useState<LeadStage>(defaultStage)
+  const [functionId, setFunctionId] = useState<string>(defaultFunctionId)
   const [assignedId, setAssignedId] = useState<string>(defaultAssignedId)
   const [nextAction, setNextAction] = useState('')
   const [followUpDate, setFollowUpDate] = useState(getTodayDateString(0))
+  const [followUpTime, setFollowUpTime] = useState('09:00')
   const [notes, setNotes] = useState('')
   const [isSaving, setIsSaving] = useState(false)
 
@@ -163,13 +170,16 @@ export const LeadModal: React.FC<LeadModalProps> = ({
     if (open) {
       setName('')
       setPhone('')
+      setEmail('')
       setOrigin('meta_ads')
       setReferredByName('')
       setInterest('Implantes')
       setStage(defaultStage)
+      setFunctionId(defaultFunctionId)
       setAssignedId(defaultAssignedId)
       setNextAction('Enviar mensagem de primeiro acolhimento via WhatsApp')
       setFollowUpDate(getTodayDateString(0))
+      setFollowUpTime('09:00')
       setNotes('')
       setErrorName('')
       setErrorPhone('')
@@ -177,7 +187,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
       setErrorReferred('')
       setIsSaving(false)
     }
-  }, [open, defaultStage, defaultAssignedId])
+  }, [open, defaultStage, defaultAssignedId, defaultFunctionId])
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatPhoneMask(e.target.value)
@@ -214,27 +224,37 @@ export const LeadModal: React.FC<LeadModalProps> = ({
     let assignedToRole: string | undefined
     let evaluatorPersonId: string | null = null
 
+    const selectedRole = roles.find((r) => r.id === functionId)
+    if (selectedRole) {
+      assignedToRole = selectedRole.name
+    }
+
     const foundColab = collaborators.find((c) => c.id === assignedId)
     if (foundColab) {
       assignedToName = foundColab.name
-      assignedToRole = 'CRC'
+      if (!assignedToRole) assignedToRole = 'CRC'
     } else {
       const foundDentist = dentists.find((d) => d.id === assignedId)
       if (foundDentist) {
         assignedToName = foundDentist.name
-        assignedToRole = 'Dentistas'
+        if (!assignedToRole) assignedToRole = 'Dentistas'
         evaluatorPersonId = foundDentist.id
       }
     }
+
+    const nextFollowUpAt = followUpDate ? `${followUpDate}T${followUpTime || '09:00'}:00Z` : null
 
     setIsSaving(true)
     addLead({
       name: name.trim(),
       phone: phone.trim(),
+      email: email.trim() || null,
+      interest,
       origin,
       referredByName: origin === 'indicacao' ? referredByName.trim() : null,
       campaign: interest,
       stage,
+      commercialFunctionId: functionId || defaultFunctionId || null,
       commercialPersonId: foundColab ? foundColab.id : null,
       evaluatorPersonId,
       assignedToId: assignedId || undefined,
@@ -242,6 +262,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
       assignedToRole,
       nextAction: nextAction.trim() || 'Aguardando primeiro contato com o paciente',
       nextContactAt: followUpDate,
+      nextFollowUpAt,
       followUpDate,
       notes: notes.trim() || undefined,
     })
@@ -281,7 +302,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
             {errorName && <p className="text-xs text-red-500">{errorName}</p>}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Telefone */}
             <div className="space-y-1.5">
               <Label htmlFor="leadPhone" className="text-xs font-semibold text-slate-700">
@@ -295,6 +316,21 @@ export const LeadModal: React.FC<LeadModalProps> = ({
                 className="h-10 text-sm"
               />
               {errorPhone && <p className="text-xs text-red-500">{errorPhone}</p>}
+            </div>
+
+            {/* E-mail (opcional) */}
+            <div className="space-y-1.5">
+              <Label htmlFor="leadEmail" className="text-xs font-semibold text-slate-700">
+                E-mail (opcional)
+              </Label>
+              <Input
+                id="leadEmail"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="paciente@exemplo.com"
+                className="h-10 text-sm"
+              />
             </div>
 
             {/* Origem */}
@@ -383,19 +419,37 @@ export const LeadModal: React.FC<LeadModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Responsável (Colaboradores e Dentistas) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Função Responsável (estrutural) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Função Responsável</Label>
+              <Select value={functionId} onValueChange={setFunctionId}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Selecione a função" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Pessoa Responsável (opcional) */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700">
-                Responsável pelo atendimento
+                Pessoa Responsável (opcional)
               </Label>
               <Select value={assignedId} onValueChange={(val) => setAssignedId(val)}>
                 <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Selecione o responsável" />
+                  <SelectValue placeholder="Selecione a pessoa" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">Sem designação pessoal</SelectItem>
                   <div className="px-2 py-1 text-[10px] font-bold uppercase text-slate-400">
-                    Colaboradores (CRC / Equipe)
+                    Colaboradores
                   </div>
                   {collaborators.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
@@ -417,7 +471,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({
             {/* Prazo de Follow-up */}
             <div className="space-y-1.5">
               <Label htmlFor="followUpDate" className="text-xs font-semibold text-slate-700">
-                Prazo de follow-up <span className="text-red-500">*</span>
+                Prazo Follow-up <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="followUpDate"

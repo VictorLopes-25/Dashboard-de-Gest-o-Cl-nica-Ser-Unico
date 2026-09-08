@@ -271,20 +271,29 @@ function mapDbLeadToUi(
     ? rolesMap?.get(l.commercial_function_id) || null
     : null
 
+  const interestDisplay = l.interest || l.campaign || 'Implantes'
+
   return {
     id: l.id,
     organizationId: l.organization_id,
     name: l.name,
     phone: l.phone || '',
+    email: l.email || null,
+    interest: interestDisplay,
     origin: l.origin,
     referredByLeadId: l.referred_by_lead_id,
     referredByName: l.referred_by_name,
     campaign: l.campaign,
     stage: l.stage,
     lostReason: l.lost_reason,
+    lossReason: l.lost_reason,
     nextAction: l.next_action || '',
-    nextContactAt: l.next_contact_at || '',
-    followUpDate: l.next_contact_at || '',
+    nextContactAt:
+      l.next_contact_at || (l.next_follow_up_at ? l.next_follow_up_at.slice(0, 10) : ''),
+    nextFollowUpAt: l.next_follow_up_at,
+    lastContactAt: l.last_contact_at,
+    followUpDate:
+      l.next_contact_at || (l.next_follow_up_at ? l.next_follow_up_at.slice(0, 10) : ''),
     commercialFunctionId: l.commercial_function_id,
     commercialPersonId: l.commercial_person_id,
     evaluatorPersonId: l.evaluator_person_id,
@@ -295,11 +304,11 @@ function mapDbLeadToUi(
     closedAt: l.closed_at,
     lostAt: l.lost_at,
     createdAt: l.created_at,
+    updatedAt: l.updated_at,
     // UI Helpers
     assignedToId: l.commercial_person_id || l.evaluator_person_id || null,
     assignedToName: assignedPersonName || (assignedRoleName ? assignedRoleName : 'CRC'),
     assignedToRole: assignedRoleName || 'CRC',
-    interest: l.campaign || 'Implantes',
     notes: null,
     lossNotes: null,
   }
@@ -319,8 +328,13 @@ function mapDbScriptToUi(s: DbScript): Script {
   }
 }
 
-function mapDbContactToUi(c: DbLeadContact, peopleMap?: Map<string, string>): ContactHistoryItem {
+function mapDbContactToUi(
+  c: DbLeadContact,
+  peopleMap?: Map<string, string>,
+  rolesMap?: Map<string, string>,
+): ContactHistoryItem {
   const registeredBy = c.person_id ? peopleMap?.get(c.person_id) || 'Equipe' : 'CRC Ser Único'
+  const functionName = c.function_id ? rolesMap?.get(c.function_id) || null : null
   const dateFormatted = c.contact_date
     ? `${c.contact_date.slice(0, 10)} ${new Date(c.contact_date).toLocaleTimeString('pt-BR', {
         hour: '2-digit',
@@ -335,8 +349,14 @@ function mapDbContactToUi(c: DbLeadContact, peopleMap?: Map<string, string>): Co
     type: c.channel || 'WhatsApp',
     date: dateFormatted,
     summary: c.notes || '',
+    outcome: c.outcome || null,
+    nextAction: c.next_action || null,
+    nextFollowUpAt: c.next_follow_up_at || null,
+    functionId: c.function_id || null,
+    functionName,
     registeredBy,
     personId: c.person_id,
+    createdAt: c.created_at,
   }
 }
 
@@ -423,6 +443,19 @@ interface AppContextType {
   updateScript: (id: string, updates: Partial<Script>) => Promise<void>
   deleteScript: (id: string) => Promise<void>
   addContactHistory: (item: Omit<ContactHistoryItem, 'id'>) => Promise<void>
+  registerLeadContactFlow: (params: {
+    leadId: string
+    channel: string
+    outcome: string
+    notes: string
+    functionId?: string | null
+    personId?: string | null
+    newStage?: LeadStage
+    nextAction?: string | null
+    nextFollowUpDate?: string | null
+    nextFollowUpTime?: string | null
+    lossReason?: string | null
+  }) => Promise<void>
 
   // Reset / Refresh
   refreshData: () => Promise<void>
@@ -582,7 +615,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // 8. Carregar Histórico de Contatos (public.lead_contacts)
       const dbContacts = await fetchLeadContactsService()
-      const mappedContacts = dbContacts.map((c) => mapDbContactToUi(c, peopleNamesMap))
+      const mappedContacts = dbContacts.map((c) =>
+        mapDbContactToUi(c, peopleNamesMap, roleNamesMap),
+      )
       setContactHistory(mappedContacts)
     } catch (err) {
       console.error('Erro crítico ao carregar dados do Supabase:', err)
@@ -1038,9 +1073,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (crcFunc) commFuncId = crcFunc.id
       }
 
+      const nextFollowUpAt =
+        leadData.nextFollowUpAt || (nextContactAt ? `${nextContactAt}T09:00:00Z` : null)
+
       const created = await createLeadService({
         name: leadData.name,
         phone: leadData.phone || null,
+        email: leadData.email || null,
+        interest: leadData.interest || leadData.campaign || 'Implantes',
         origin: leadData.origin,
         referred_by_lead_id: leadData.referredByLeadId || null,
         referred_by_name: leadData.referredByName || null,
@@ -1048,6 +1088,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         stage,
         next_action: leadData.nextAction || 'Aguardando primeiro contato com o paciente',
         next_contact_at: nextContactAt,
+        next_follow_up_at: nextFollowUpAt,
+        last_contact_at: leadData.lastContactAt || null,
         commercial_function_id: commFuncId,
         commercial_person_id: commPersonId,
         evaluator_person_id: leadData.evaluatorPersonId || null,
@@ -1096,6 +1138,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (updates.name !== undefined) dbUpdates.name = updates.name
       if (updates.phone !== undefined) dbUpdates.phone = updates.phone
+      if (updates.email !== undefined) dbUpdates.email = updates.email
+      if (updates.interest !== undefined) dbUpdates.interest = updates.interest
       if (updates.origin !== undefined) dbUpdates.origin = updates.origin
       if (updates.referredByLeadId !== undefined)
         dbUpdates.referred_by_lead_id = updates.referredByLeadId
@@ -1108,6 +1152,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const nextContact = updates.nextContactAt ?? updates.followUpDate
       if (nextContact !== undefined) {
         dbUpdates.next_contact_at = nextContact
+      }
+      if (updates.nextFollowUpAt !== undefined) {
+        dbUpdates.next_follow_up_at = updates.nextFollowUpAt
+      }
+      if (updates.lastContactAt !== undefined) {
+        dbUpdates.last_contact_at = updates.lastContactAt
       }
 
       if (updates.commercialFunctionId !== undefined)
@@ -1281,15 +1331,102 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         channel: item.type,
         notes: item.summary,
         person_id: item.personId || null,
+        function_id: item.functionId || null,
+        outcome: item.outcome || null,
+        next_action: item.nextAction || null,
+        next_follow_up_at: item.nextFollowUpAt || null,
         contact_date: item.date || new Date().toISOString(),
       })
       const peopleMap = new Map(collaborators.map((c) => [c.id, c.name]))
-      const uiContact = mapDbContactToUi(created, peopleMap)
+      const rolesMap = new Map(roles.map((r) => [r.id, r.name]))
+      const uiContact = mapDbContactToUi(created, peopleMap, rolesMap)
       setContactHistory((prev) => [uiContact, ...prev])
     } catch (err) {
       console.error('Falha ao registrar contato com lead no Supabase:', err)
       throw err
     }
+  }
+
+  /**
+   * Registro completo de contato operacional para CRM/CRC:
+   * - Insere registro imutável em lead_contacts
+   * - Atualiza lead.last_contact_at
+   * - Opcionalmente atualiza lead.stage
+   * - Opcionalmente define nova próxima ação e prazo de follow-up (next_contact_at, next_follow_up_at)
+   * - Sincroniza agenda_items de forma idempotente se stage ativo
+   */
+  const registerLeadContactFlow = async (params: {
+    leadId: string
+    channel: string
+    outcome: string
+    notes: string
+    functionId?: string | null
+    personId?: string | null
+    newStage?: LeadStage
+    nextAction?: string | null
+    nextFollowUpDate?: string | null // YYYY-MM-DD
+    nextFollowUpTime?: string | null // HH:MM
+    lossReason?: string | null
+  }) => {
+    const nowIso = new Date().toISOString()
+    const targetLead = leads.find((l) => l.id === params.leadId)
+    if (!targetLead) throw new Error('Lead não encontrado.')
+
+    // 1. Determinar timestamp do próximo follow-up se fornecido
+    let nextFollowUpAt: string | null = null
+    let nextContactAt = targetLead.nextContactAt
+    if (params.nextFollowUpDate) {
+      nextContactAt = params.nextFollowUpDate
+      const timeStr = params.nextFollowUpTime || '09:00'
+      nextFollowUpAt = `${params.nextFollowUpDate}T${timeStr}:00Z`
+    }
+
+    // 2. Registrar contato imutável em lead_contacts
+    await addContactHistory({
+      leadId: params.leadId,
+      type: params.channel,
+      date: nowIso,
+      summary: params.notes,
+      outcome: params.outcome,
+      nextAction: params.nextAction || null,
+      nextFollowUpAt,
+      functionId: params.functionId || targetLead.commercialFunctionId || null,
+      personId: params.personId || targetLead.commercialPersonId || null,
+      registeredBy: currentUser?.name || 'CRC Ser Único',
+    })
+
+    // 3. Montar updates do Lead
+    const leadUpdates: Partial<Lead> = {
+      lastContactAt: nowIso,
+    }
+
+    if (params.nextAction !== undefined && params.nextAction !== null) {
+      leadUpdates.nextAction = params.nextAction
+    }
+
+    if (params.nextFollowUpDate) {
+      leadUpdates.nextContactAt = params.nextFollowUpDate
+      leadUpdates.followUpDate = params.nextFollowUpDate
+      leadUpdates.nextFollowUpAt = nextFollowUpAt
+    }
+
+    const nextStage = params.newStage || targetLead.stage
+    if (nextStage !== targetLead.stage) {
+      leadUpdates.stage = nextStage
+      if (nextStage === 'fechado') {
+        leadUpdates.closedAt = nowIso
+        leadUpdates.lostAt = null
+      } else if (nextStage === 'perdido') {
+        leadUpdates.lostAt = nowIso
+        leadUpdates.closedAt = null
+        leadUpdates.lostReason = params.lossReason || 'Perda sem motivo informado'
+      } else {
+        leadUpdates.closedAt = null
+        leadUpdates.lostAt = null
+      }
+    }
+
+    await updateLead(params.leadId, leadUpdates)
   }
 
   // Reset dados: recarrega tudo do Supabase
@@ -1345,6 +1482,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateScript,
         deleteScript,
         addContactHistory,
+        registerLeadContactFlow,
         refreshData,
         resetData,
       }}

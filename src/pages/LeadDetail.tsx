@@ -4,6 +4,7 @@ import { useApp } from '@/context/AppContext'
 import { LeadStage, ContactType } from '@/types'
 import { STAGES_CONFIG } from '@/components/LeadModal'
 import { LossModal } from '@/components/LossModal'
+import { QuickContactModal } from '@/components/QuickContactModal'
 import { getTodayDateString } from '@/data/mockData'
 import {
   Phone,
@@ -54,6 +55,8 @@ export default function LeadDetail() {
     getHistoryForLead,
     addContactHistory,
     scripts,
+    roles,
+    collaborators,
     currentUser,
   } = useApp()
 
@@ -61,19 +64,15 @@ export default function LeadDetail() {
 
   // Modals state
   const [lossModalOpen, setLossModalOpen] = useState(false)
-  const [contactModalOpen, setContactModalOpen] = useState(false)
+  const [quickContactOpen, setQuickContactOpen] = useState(false)
   const [editActionModalOpen, setEditActionModalOpen] = useState(false)
 
   // Edit next action form
   const [editNextAction, setEditNextAction] = useState('')
   const [editFollowUpDate, setEditFollowUpDate] = useState('')
-
-  // Register contact form
-  const [contactType, setContactType] = useState<ContactType>('WhatsApp')
-  const [contactDateTime, setContactDateTime] = useState('')
-  const [contactSummary, setContactSummary] = useState('')
-  const [isScriptExpanded, setIsScriptExpanded] = useState(true)
-  const [scriptUsedTitle, setScriptUsedTitle] = useState<string>('')
+  const [editFollowUpTime, setEditFollowUpTime] = useState('09:00')
+  const [editFunctionId, setEditFunctionId] = useState('')
+  const [editPersonId, setEditPersonId] = useState('')
 
   const todayStr = getTodayDateString(0)
 
@@ -115,6 +114,9 @@ export default function LeadDetail() {
   const handleOpenEditAction = () => {
     setEditNextAction(lead.nextAction)
     setEditFollowUpDate(currentDueDate || todayStr)
+    setEditFollowUpTime(lead.nextFollowUpAt ? lead.nextFollowUpAt.slice(11, 16) : '09:00')
+    setEditFunctionId(lead.commercialFunctionId || '')
+    setEditPersonId(lead.commercialPersonId || '')
     setEditActionModalOpen(true)
   }
 
@@ -122,59 +124,20 @@ export default function LeadDetail() {
     e.preventDefault()
     if (!editNextAction.trim() || !editFollowUpDate) return
 
+    const nextFollowUpAt = `${editFollowUpDate}T${editFollowUpTime || '09:00'}:00Z`
+
     try {
       await updateLead(lead.id, {
         nextAction: editNextAction.trim(),
         nextContactAt: editFollowUpDate,
         followUpDate: editFollowUpDate,
+        nextFollowUpAt,
+        commercialFunctionId: editFunctionId || null,
+        commercialPersonId: editPersonId || null,
       })
       setEditActionModalOpen(false)
     } catch (err: any) {
       alert(err.message || 'Falha ao atualizar próxima ação.')
-    }
-  }
-
-  // Open Contact Register Modal
-  const handleOpenContactModal = () => {
-    const now = new Date()
-    const nowFormatted = `${now.toISOString().split('T')[0]} ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-    setContactType('WhatsApp')
-    setContactDateTime(nowFormatted)
-    setContactSummary('')
-    setScriptUsedTitle(suggestedScript?.title || '')
-    setContactModalOpen(true)
-  }
-
-  const handleInsertScript = () => {
-    if (suggestedScript) {
-      // Replace placeholders if any
-      const textWithLeadName = suggestedScript.content.replace(
-        /\[Nome do Paciente\]/g,
-        lead.name.split(' ')[0],
-      )
-      setContactSummary((prev) => (prev ? `${prev}\n\n${textWithLeadName}` : textWithLeadName))
-      setScriptUsedTitle(suggestedScript.title)
-    }
-  }
-
-  const handleSaveContact = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!contactSummary.trim()) return
-
-    try {
-      await addContactHistory({
-        leadId: lead.id,
-        type: contactType,
-        date: new Date().toISOString(),
-        summary: contactSummary.trim(),
-        scriptTitleUsed: scriptUsedTitle || undefined,
-        registeredBy: currentUser?.name || 'CRC Ser Único',
-        personId: currentUser?.id || null,
-      })
-
-      setContactModalOpen(false)
-    } catch (err: any) {
-      alert(err.message || 'Falha ao salvar contato.')
     }
   }
 
@@ -272,6 +235,12 @@ export default function LeadDetail() {
             {/* Subtitle / Details */}
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span className="font-medium text-slate-700">{lead.phone}</span>
+              {lead.email && (
+                <>
+                  <span>•</span>
+                  <span>{lead.email}</span>
+                </>
+              )}
               <span>•</span>
               <span className="px-2 py-0.5 rounded bg-slate-100 font-medium text-slate-700">
                 Origem: {lead.origin}
@@ -282,7 +251,21 @@ export default function LeadDetail() {
               </span>
               <span>•</span>
               <span>
-                Responsável: <strong>{lead.assignedToName || 'CRC'}</strong>
+                Função:{' '}
+                <strong>
+                  {roles.find((r) => r.id === lead.commercialFunctionId)?.name ||
+                    lead.assignedToRole ||
+                    'CRC'}
+                </strong>
+              </span>
+              <span>•</span>
+              <span>
+                Responsável:{' '}
+                <strong>
+                  {collaborators.find((c) => c.id === lead.commercialPersonId)?.name ||
+                    lead.assignedToName ||
+                    'Equipe'}
+                </strong>
               </span>
             </div>
 
@@ -313,7 +296,7 @@ export default function LeadDetail() {
           </a>
 
           <Button
-            onClick={handleOpenContactModal}
+            onClick={() => setQuickContactOpen(true)}
             className="bg-teal-700 hover:bg-teal-800 text-white text-xs font-semibold shadow-xs gap-1.5"
           >
             <Plus className="w-4 h-4" />
@@ -342,7 +325,7 @@ export default function LeadDetail() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleOpenContactModal}
+              onClick={() => setQuickContactOpen(true)}
               className="text-xs font-semibold text-teal-800 border-teal-200 hover:bg-teal-50 gap-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -374,9 +357,21 @@ export default function LeadDetail() {
                     <div className="bg-slate-50/70 hover:bg-slate-50 p-4 rounded-xl border border-slate-200/80 transition-all space-y-2">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-slate-800">{item.type}</span>
+                          <span className="text-xs font-bold text-slate-800 px-2 py-0.5 rounded bg-slate-200/70">
+                            {item.type}
+                          </span>
+                          {item.outcome && (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-teal-100 text-teal-800 border border-teal-200">
+                              {item.outcome}
+                            </span>
+                          )}
                           <span className="text-[11px] text-slate-400">•</span>
                           <span className="text-[11px] font-medium text-slate-500">
+                            {item.functionName ? (
+                              <span className="text-teal-800 font-bold mr-1">
+                                [{item.functionName}]
+                              </span>
+                            ) : null}
                             Por <strong>{item.registeredBy}</strong>
                           </span>
                         </div>
@@ -387,11 +382,11 @@ export default function LeadDetail() {
                         </span>
                       </div>
 
-                      {/* Script Chip Used */}
-                      {item.scriptTitleUsed && (
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-medium">
-                          <FileText className="w-3 h-3" />
-                          <span>Script: {item.scriptTitleUsed}</span>
+                      {/* Next Action Recorded in interaction */}
+                      {item.nextAction && (
+                        <div className="text-[11px] text-teal-900 bg-teal-50/80 p-2 rounded-lg border border-teal-100 font-medium">
+                          <strong>Próxima ação agendada:</strong> {item.nextAction}
+                          {item.nextFollowUpAt && ` (para ${item.nextFollowUpAt.slice(0, 10)})`}
                         </div>
                       )}
 
@@ -529,118 +524,8 @@ export default function LeadDetail() {
         </div>
       </div>
 
-      {/* MODAL: Registrar Contato */}
-      <Dialog open={contactModalOpen} onOpenChange={setContactModalOpen}>
-        <DialogContent className="sm:max-w-[560px] max-h-[92vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-slate-900">
-              Registrar Contato com {lead.name}
-            </DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSaveContact} className="space-y-4 py-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Tipo de Contato */}
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">Tipo de contato</Label>
-                <Select
-                  value={contactType}
-                  onValueChange={(val) => setContactType(val as ContactType)}
-                >
-                  <SelectTrigger className="h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="WhatsApp">WhatsApp</SelectItem>
-                    <SelectItem value="Ligação">Ligação telefônica</SelectItem>
-                    <SelectItem value="Presencial">Presencial (na clínica)</SelectItem>
-                    <SelectItem value="E-mail">E-mail</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Data e Hora */}
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">Data e hora</Label>
-                <Input
-                  type="text"
-                  value={contactDateTime}
-                  onChange={(e) => setContactDateTime(e.target.value)}
-                  placeholder="2025-05-10 14:30"
-                  className="h-10 text-sm"
-                />
-              </div>
-            </div>
-
-            {/* Script Sugerido para esta etapa (Bloco Colapsável) */}
-            {suggestedScript && (
-              <div className="rounded-xl border border-purple-200 bg-purple-50/50 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setIsScriptExpanded(!isScriptExpanded)}
-                  className="w-full p-3 flex items-center justify-between text-xs font-bold text-purple-900 bg-purple-100/50 hover:bg-purple-100 transition"
-                >
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-purple-600" />
-                    <span>Script sugerido para a etapa "{lead.stage}"</span>
-                  </div>
-                  {isScriptExpanded ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
-                  )}
-                </button>
-
-                {isScriptExpanded && (
-                  <div className="p-3 space-y-2">
-                    <p className="text-xs font-semibold text-purple-950">{suggestedScript.title}</p>
-                    <div className="p-2.5 rounded-lg bg-white border border-purple-200 text-xs text-slate-700 max-h-36 overflow-y-auto whitespace-pre-line leading-relaxed">
-                      {suggestedScript.content}
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleInsertScript}
-                      className="w-full text-xs font-bold bg-white text-purple-800 border-purple-300 hover:bg-purple-100 gap-1.5"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      Inserir no resumo do contato
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Resumo do Contato */}
-            <div className="space-y-1.5">
-              <Label htmlFor="contactSummary" className="text-xs font-semibold text-slate-700">
-                Resumo da conversa / interação <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                id="contactSummary"
-                value={contactSummary}
-                onChange={(e) => setContactSummary(e.target.value)}
-                placeholder="Descreva o que foi tratado, dúvidas esclarecidas pelo paciente e próximos combinados..."
-                className="text-sm min-h-[110px]"
-                required
-              />
-            </div>
-
-            <DialogFooter className="gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setContactModalOpen(false)}>
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                className="bg-teal-700 hover:bg-teal-800 text-white font-medium"
-              >
-                Salvar Contato
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* MODAL: Registrar Contato Rápido & Completo */}
+      <QuickContactModal lead={lead} open={quickContactOpen} onOpenChange={setQuickContactOpen} />
 
       {/* MODAL: Editar Próxima Ação */}
       <Dialog open={editActionModalOpen} onOpenChange={setEditActionModalOpen}>
@@ -666,18 +551,68 @@ export default function LeadDetail() {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="editFollowUpDate" className="text-xs font-semibold text-slate-700">
-                Novo prazo de follow-up <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="editFollowUpDate"
-                type="date"
-                value={editFollowUpDate}
-                onChange={(e) => setEditFollowUpDate(e.target.value)}
-                className="h-10 text-sm"
-                required
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="editFollowUpDate" className="text-xs font-semibold text-slate-700">
+                  Novo prazo de follow-up <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="editFollowUpDate"
+                  type="date"
+                  value={editFollowUpDate}
+                  onChange={(e) => setEditFollowUpDate(e.target.value)}
+                  className="h-10 text-sm"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="editFollowUpTime" className="text-xs font-semibold text-slate-700">
+                  Horário
+                </Label>
+                <Input
+                  id="editFollowUpTime"
+                  type="time"
+                  value={editFollowUpTime}
+                  onChange={(e) => setEditFollowUpTime(e.target.value)}
+                  className="h-10 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Função Responsável</Label>
+                <Select value={editFunctionId} onValueChange={setEditFunctionId}>
+                  <SelectTrigger className="h-10 text-xs">
+                    <SelectValue placeholder="Selecione a função" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Pessoa Responsável</Label>
+                <Select value={editPersonId} onValueChange={setEditPersonId}>
+                  <SelectTrigger className="h-10 text-xs">
+                    <SelectValue placeholder="Opcional" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sem designação pessoal</SelectItem>
+                    {collaborators.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <DialogFooter className="gap-2 pt-2">

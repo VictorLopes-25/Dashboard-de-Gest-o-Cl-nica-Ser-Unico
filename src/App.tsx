@@ -16,6 +16,7 @@ import Scripts from './pages/Scripts'
 import Funcoes from './pages/Funcoes'
 import Colaboradores from './pages/Colaboradores'
 import Dentistas from './pages/Dentistas'
+import CrcWorkspace from './pages/CrcWorkspace'
 import NotFound from './pages/NotFound'
 
 const App = () => (
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/tarefas" element={<Tarefas />} />
+            <Route path="/crc" element={<CrcWorkspace />} />
             <Route path="/crm" element={<Leads />} />
             <Route path="/crm/leads/:id" element={<LeadDetail />} />
             <Route path="/crm/scripts" element={<Scripts />} />

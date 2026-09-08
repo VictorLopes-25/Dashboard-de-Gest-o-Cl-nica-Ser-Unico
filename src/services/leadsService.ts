@@ -7,6 +7,8 @@ export interface DbLead {
   organization_id: string
   name: string
   phone: string | null
+  email: string | null
+  interest: string | null
   origin: LeadOrigin
   referred_by_lead_id: string | null
   referred_by_name: string | null
@@ -15,6 +17,8 @@ export interface DbLead {
   lost_reason: string | null
   next_action: string | null
   next_contact_at: string | null // date YYYY-MM-DD
+  next_follow_up_at: string | null // TIMESTAMPTZ
+  last_contact_at: string | null // TIMESTAMPTZ
   commercial_function_id: string | null
   commercial_person_id: string | null
   evaluator_person_id: string | null
@@ -25,6 +29,7 @@ export interface DbLead {
   closed_at: string | null
   lost_at: string | null
   created_at: string
+  updated_at: string
 }
 
 export interface DbLeadContact {
@@ -35,12 +40,18 @@ export interface DbLeadContact {
   channel: string | null
   notes: string | null
   person_id: string | null
+  function_id: string | null
+  outcome: string | null
+  next_action: string | null
+  next_follow_up_at: string | null
   created_at: string
 }
 
 export interface CreateLeadPayload {
   name: string
   phone?: string | null
+  email?: string | null
+  interest?: string | null
   origin: LeadOrigin
   referred_by_lead_id?: string | null
   referred_by_name?: string | null
@@ -48,6 +59,8 @@ export interface CreateLeadPayload {
   stage?: LeadStage
   next_action?: string | null
   next_contact_at?: string | null
+  next_follow_up_at?: string | null
+  last_contact_at?: string | null
   commercial_function_id?: string | null
   commercial_person_id?: string | null
   evaluator_person_id?: string | null
@@ -63,6 +76,8 @@ export interface CreateLeadPayload {
 export interface UpdateLeadPayload {
   name?: string
   phone?: string | null
+  email?: string | null
+  interest?: string | null
   origin?: LeadOrigin
   referred_by_lead_id?: string | null
   referred_by_name?: string | null
@@ -71,6 +86,8 @@ export interface UpdateLeadPayload {
   lost_reason?: string | null
   next_action?: string | null
   next_contact_at?: string | null
+  next_follow_up_at?: string | null
+  last_contact_at?: string | null
   commercial_function_id?: string | null
   commercial_person_id?: string | null
   evaluator_person_id?: string | null
@@ -87,6 +104,10 @@ export interface CreateLeadContactPayload {
   channel?: string | null
   notes?: string | null
   person_id?: string | null
+  function_id?: string | null
+  outcome?: string | null
+  next_action?: string | null
+  next_follow_up_at?: string | null
   contact_date?: string
 }
 
@@ -216,6 +237,8 @@ export async function createLead(payload: CreateLeadPayload): Promise<DbLead> {
     organization_id: orgId,
     name: payload.name.trim(),
     phone: payload.phone?.trim() || null,
+    email: payload.email?.trim() || null,
+    interest: payload.interest?.trim() || payload.campaign?.trim() || null,
     origin: payload.origin,
     referred_by_lead_id: payload.referred_by_lead_id || null,
     referred_by_name: payload.referred_by_name?.trim() || null,
@@ -224,6 +247,9 @@ export async function createLead(payload: CreateLeadPayload): Promise<DbLead> {
     lost_reason: payload.lost_reason?.trim() || null,
     next_action: payload.next_action?.trim() || 'Aguardando primeiro contato com o paciente',
     next_contact_at: nextContactAt,
+    next_follow_up_at:
+      payload.next_follow_up_at || (nextContactAt ? `${nextContactAt}T09:00:00Z` : null),
+    last_contact_at: payload.last_contact_at || null,
     commercial_function_id: payload.commercial_function_id || null,
     commercial_person_id: payload.commercial_person_id || null,
     evaluator_person_id: payload.evaluator_person_id || null,
@@ -233,9 +259,10 @@ export async function createLead(payload: CreateLeadPayload): Promise<DbLead> {
     sale_date: payload.sale_date || null,
     closed_at: payload.closed_at || null,
     lost_at: payload.lost_at || null,
+    updated_at: new Date().toISOString(),
   }
 
-  const { data, error } = await supabase.from('leads').insert(insertData).select().single()
+  const { data, error } = await (supabase.from('leads') as any).insert(insertData).select().single()
 
   if (error) {
     console.error('Erro ao criar lead:', error)
@@ -274,9 +301,14 @@ export async function updateLead(id: string, updates: UpdateLeadPayload): Promis
 
   validateLeadConstraints(merged)
 
-  const dbUpdates: Record<string, any> = {}
+  const dbUpdates: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  }
   if (updates.name !== undefined) dbUpdates.name = updates.name.trim()
   if (updates.phone !== undefined) dbUpdates.phone = updates.phone ? updates.phone.trim() : null
+  if (updates.email !== undefined) dbUpdates.email = updates.email ? updates.email.trim() : null
+  if (updates.interest !== undefined)
+    dbUpdates.interest = updates.interest ? updates.interest.trim() : null
   if (updates.origin !== undefined) dbUpdates.origin = updates.origin
   if (updates.referred_by_lead_id !== undefined)
     dbUpdates.referred_by_lead_id = updates.referred_by_lead_id || null
@@ -290,6 +322,9 @@ export async function updateLead(id: string, updates: UpdateLeadPayload): Promis
   if (updates.next_action !== undefined)
     dbUpdates.next_action = updates.next_action ? updates.next_action.trim() : null
   if (updates.next_contact_at !== undefined) dbUpdates.next_contact_at = updates.next_contact_at
+  if (updates.next_follow_up_at !== undefined)
+    dbUpdates.next_follow_up_at = updates.next_follow_up_at
+  if (updates.last_contact_at !== undefined) dbUpdates.last_contact_at = updates.last_contact_at
   if (updates.commercial_function_id !== undefined)
     dbUpdates.commercial_function_id = updates.commercial_function_id || null
   if (updates.commercial_person_id !== undefined)
@@ -378,14 +413,17 @@ export async function fetchLeadContacts(leadId?: string): Promise<DbLeadContact[
 export async function createLeadContact(payload: CreateLeadContactPayload): Promise<DbLeadContact> {
   const orgId = await getOrganizationId()
 
-  const { data, error } = await supabase
-    .from('lead_contacts')
+  const { data, error } = await (supabase.from('lead_contacts') as any)
     .insert({
       organization_id: orgId,
       lead_id: payload.lead_id,
       channel: payload.channel || 'WhatsApp',
       notes: payload.notes?.trim() || null,
       person_id: payload.person_id || null,
+      function_id: payload.function_id || null,
+      outcome: payload.outcome?.trim() || null,
+      next_action: payload.next_action?.trim() || null,
+      next_follow_up_at: payload.next_follow_up_at || null,
       contact_date: payload.contact_date || new Date().toISOString(),
     })
     .select()

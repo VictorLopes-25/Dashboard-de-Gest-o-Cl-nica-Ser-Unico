@@ -64,6 +64,8 @@ export interface Lead {
   organizationId?: string
   name: string
   phone: string
+  email?: string | null
+  interest?: string | null
   origin: LeadOrigin
   referredByLeadId?: string | null
   referredByName?: string | null
@@ -73,6 +75,8 @@ export interface Lead {
   lossReason?: string | null
   nextAction: string
   nextContactAt: string // YYYY-MM-DD (exigido para stages ativos)
+  nextFollowUpAt?: string | null // ISO timestamp with timezone
+  lastContactAt?: string | null // ISO timestamp with timezone
   commercialFunctionId?: string | null
   commercialPersonId?: string | null
   evaluatorPersonId?: string | null
@@ -83,12 +87,12 @@ export interface Lead {
   closedAt?: string | null
   lostAt?: string | null
   createdAt: string
+  updatedAt?: string
   // UI helpers compatíveis
   followUpDate?: string // alias para nextContactAt
   assignedToId?: string | null
   assignedToName?: string | null
   assignedToRole?: string | null
-  interest?: string
   notes?: string | null
   lossNotes?: string | null
 }
@@ -129,9 +133,15 @@ export interface ContactHistoryItem {
   type: string
   date: string
   summary: string
+  outcome?: string | null
+  nextAction?: string | null
+  nextFollowUpAt?: string | null
+  functionId?: string | null
+  functionName?: string | null
   scriptTitleUsed?: string
   registeredBy: string
   personId?: string | null
+  createdAt?: string
 }
 
 export type TaskStatus = 'Pendente' | 'Em andamento' | 'Concluída'
@@ -179,7 +189,26 @@ export type LossReason =
   | 'Prazo'
   | 'Outro'
 
-export type ContactType = 'WhatsApp' | 'Ligação' | 'E-mail' | 'Presencial'
+export type ContactType =
+  | 'WhatsApp'
+  | 'Telefone'
+  | 'Ligação'
+  | 'Instagram'
+  | 'Email'
+  | 'E-mail'
+  | 'Presencial'
+  | 'Outro'
+
+export type ContactOutcome =
+  | 'Sem resposta'
+  | 'Mensagem enviada'
+  | 'Conversa iniciada'
+  | 'Avaliação agendada'
+  | 'Pediu para retornar'
+  | 'Proposta em análise'
+  | 'Tratamento fechado'
+  | 'Sem interesse'
+  | 'Outro'
 
 export type DentalSpecialty =
   | 'Implantodontia'
