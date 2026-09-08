@@ -72,6 +72,40 @@ describe('Stage 4A: Auth / Identity + OWNER Rule + Base Access Enforcement + RLS
       const { data: checkRole } = await supabase.rpc('current_org_role')
       expect(checkRole === 'OWNER' || checkRole === null).toBe(true)
     })
+
+    it('BOOTSTRAP 3: get_bootstrap_status() expõe disponibilidade sem requerer sessão prévia', async () => {
+      const { data, error } = await (supabase.rpc as any)('get_bootstrap_status')
+      expect(error).toBeNull()
+      expect(data).toBeDefined()
+      const res = data as Record<string, any>
+      expect(typeof res.available).toBe('boolean')
+      if (res.available) {
+        expect(res.target_org_id).toBeTruthy()
+        expect(res.owner_count).toBe(0)
+      }
+    })
+
+    it('BOOTSTRAP 4: bootstrap_initial_owner valida entradas (e-mail, senha, nome)', async () => {
+      // Teste com senha curta (< 6 caracteres)
+      const { error: passErr } = await (supabase.rpc as any)('bootstrap_initial_owner', {
+        target_org_id: orgId,
+        owner_name: 'Owner Test',
+        owner_email: 'invalid-owner@serunico.com.br',
+        owner_password: '123',
+      })
+      expect(passErr).not.toBeNull()
+      expect(passErr?.message).toMatch(/mínimo 6 caracteres/i)
+
+      // Teste com e-mail inválido
+      const { error: emailErr } = await (supabase.rpc as any)('bootstrap_initial_owner', {
+        target_org_id: orgId,
+        owner_name: 'Owner Test',
+        owner_email: 'invalid-email',
+        owner_password: 'Password123!',
+      })
+      expect(emailErr).not.toBeNull()
+      expect(emailErr?.message).toMatch(/E-mail inválido/i)
+    })
   })
 
   describe('DEFENSE IN DEPTH: FUNCTION_ASSIGNMENTS MUTATION RULES', () => {

@@ -36,6 +36,11 @@ interface AuthContextType {
   ) => Promise<{ error: string | null; needsBootstrap?: boolean }>
   logout: () => Promise<void>
   bootstrapOwner: (ownerName: string) => Promise<{ success: boolean; error?: string }>
+  registerInitialOwner: (
+    name: string,
+    email: string,
+    pass: string,
+  ) => Promise<{ success: boolean; error?: string }>
   refreshAuthState: () => Promise<void>
 }
 
@@ -50,40 +55,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [targetOrgName, setTargetOrgName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const resolveAuthState = useCallback(async (currentUid: string | null) => {
-    if (!currentUid) {
-      setResolvedPerson(null)
-      setNeedsBootstrap(false)
-      setTargetOrgId(null)
-      setTargetOrgName(null)
-      return
-    }
-
+  const checkBootstrapAvailability = useCallback(async () => {
     try {
-      const { data, error } = await supabase.rpc('get_auth_state')
-      if (error) {
-        console.error('Erro ao resolver get_auth_state:', error)
+      const { data, error } = await (supabase.rpc as any)('get_bootstrap_status')
+      if (!error && data) {
+        const res = data as {
+          available: boolean
+          target_org_id?: string
+          target_org_name?: string
+          owner_count?: number
+        }
+        if (res.available) {
+          setNeedsBootstrap(true)
+          if (res.target_org_id) setTargetOrgId(res.target_org_id)
+          if (res.target_org_name) setTargetOrgName(res.target_org_name)
+          return true
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao verificar disponibilidade de bootstrap:', err)
+    }
+    return false
+  }, [])
+
+  const resolveAuthState = useCallback(
+    async (currentUid: string | null) => {
+      if (!currentUid) {
+        setResolvedPerson(null)
+        await checkBootstrapAvailability()
         return
       }
 
-      const res = data as unknown as AuthStateResponse
-      if (res?.needs_bootstrap) {
-        setNeedsBootstrap(true)
-        setResolvedPerson(null)
-        setTargetOrgId(res.target_org_id || null)
-        setTargetOrgName(res.target_org_name || null)
-      } else if (res?.person) {
-        setResolvedPerson(res.person)
-        setNeedsBootstrap(false)
-        setTargetOrgId(res.person.organization_id)
-      } else {
-        setResolvedPerson(null)
-        setNeedsBootstrap(false)
+      try {
+        const { data, error } = await supabase.rpc('get_auth_state')
+        if (error) {
+          console.error('Erro ao resolver get_auth_state:', error)
+          return
+        }
+
+        const res = data as unknown as AuthStateResponse
+        if (res?.needs_bootstrap) {
+          setNeedsBootstrap(true)
+          setResolvedPerson(null)
+          setTargetOrgId(res.target_org_id || null)
+          setTargetOrgName(res.target_org_name || null)
+        } else if (res?.person) {
+          setResolvedPerson(res.person)
+          setNeedsBootstrap(false)
+          setTargetOrgId(res.person.organization_id)
+        } else {
+          setResolvedPerson(null)
+          setNeedsBootstrap(false)
+        }
+      } catch (err) {
+        console.error('Erro ao carregar estado de identidade:', err)
       }
-    } catch (err) {
-      console.error('Erro ao carregar estado de identidade:', err)
-    }
-  }, [])
+    },
+    [checkBootstrapAvailability],
+  )
 
   useEffect(() => {
     const {
@@ -94,8 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(newSession?.user ?? null)
       if (!newSession?.user) {
         setResolvedPerson(null)
-        setNeedsBootstrap(false)
-        setLoading(false)
+        checkBootstrapAvailability().finally(() => setLoading(false))
       }
     })
 
@@ -105,14 +133,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (initialSession?.user) {
         resolveAuthState(initialSession.user.id).finally(() => setLoading(false))
       } else {
-        setLoading(false)
+        checkBootstrapAvailability().finally(() => setLoading(false))
       }
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [resolveAuthState])
+  }, [resolveAuthState, checkBootstrapAvailability])
 
   // Quando o user muda (ex.: após login), resolver o person
   useEffect(() => {
@@ -176,9 +204,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
+  const registerInitialOwner = async (name: string, emailStr: string, pass: string) => {
+    try {
+      let orgId = targetOrgId
+      if (!orgId) {
+        orgId = await getOrganizationId()
+      }
+
+      // 1. Invoca a RPC atômica bootstrap_initial_owner
+      const { data, error } = await (supabase.rpc as any)('bootstrap_initial_owner', {
+        target_org_id: orgId,
+        owner_name: name,
+        owner_email: emailStr,
+        owner_password: pass,
+      })
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      // 2. Com a conta de auth criada e vinculada como OWNER, autentica o usuário
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: emailStr,
+        password: pass,
+      })
+
+      if (signInError) {
+        return {
+          success: false,
+          error: `Cadastro concluído com sucesso, mas o login automático falhou: ${signInError.message}`,
+        }
+      }
+
+      // 3. Atualizar estado de autenticação
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (sessionData?.session) {
+        setSession(sessionData.session)
+        setUser(sessionData.session.user)
+        await resolveAuthState(sessionData.session.user.id)
+      }
+
+      return { success: true }
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || 'Falha no processo de inicialização do primeiro OWNER.',
+      }
+    }
+  }
+
   const refreshAuthState = async () => {
     if (user?.id) {
       await resolveAuthState(user.id)
+    } else {
+      await checkBootstrapAvailability()
     }
   }
 
@@ -195,6 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         bootstrapOwner,
+        registerInitialOwner,
         refreshAuthState,
       }}
     >

@@ -36,6 +36,7 @@ export default function Index() {
     login,
     logout,
     bootstrapOwner,
+    registerInitialOwner,
     loading: authLoading,
   } = useAuth()
   const { roles, currentUser, switchRoleContext } = useApp()
@@ -44,6 +45,7 @@ export default function Index() {
   // Form states
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [ownerName, setOwnerName] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -70,7 +72,7 @@ export default function Index() {
     setSubmitting(true)
     try {
       const res = await login(email.trim(), password)
-      if (res.error) {
+      if (res?.error) {
         setErrorMsg('Credenciais inválidas. Verifique seu e-mail e senha.')
         return
       }
@@ -85,26 +87,67 @@ export default function Index() {
     e.preventDefault()
     setErrorMsg('')
 
+    // Se já estiver logado, usa bootstrapOwner com nome
+    if (user) {
+      if (!ownerName.trim()) {
+        setErrorMsg('Por favor, informe seu nome completo de proprietário/administrador.')
+        return
+      }
+
+      setSubmitting(true)
+      try {
+        const res = await bootstrapOwner(ownerName.trim())
+        if (!res.success) {
+          setErrorMsg(res.error || 'Falha ao concluir o bootstrap de OWNER.')
+          return
+        }
+
+        toast({
+          title: 'Organização inicializada com sucesso!',
+          description: 'Você foi registrado como OWNER da clínica Ser Único.',
+        })
+        navigate('/dashboard')
+      } catch (err: any) {
+        setErrorMsg(err?.message || 'Erro inesperado no setup inicial.')
+      } finally {
+        setSubmitting(false)
+      }
+      return
+    }
+
+    // Se não estiver logado, realiza registro completo do primeiro OWNER
     if (!ownerName.trim()) {
-      setErrorMsg('Por favor, informe seu nome completo de proprietário/administrador.')
+      setErrorMsg('Informe o nome completo do primeiro proprietário (OWNER).')
+      return
+    }
+    if (!email.trim() || !email.includes('@')) {
+      setErrorMsg('Informe um e-mail institucional válido.')
+      return
+    }
+    if (!password || password.length < 6) {
+      setErrorMsg('A senha deve ter pelo menos 6 caracteres.')
+      return
+    }
+    if (password !== confirmPassword) {
+      setErrorMsg('A confirmação da senha não confere com a senha digitada.')
       return
     }
 
     setSubmitting(true)
     try {
-      const res = await bootstrapOwner(ownerName.trim())
+      const res = await registerInitialOwner(ownerName.trim(), email.trim(), password)
       if (!res.success) {
-        setErrorMsg(res.error || 'Falha ao concluir o bootstrap de OWNER.')
+        setErrorMsg(res.error || 'Falha ao concluir o registro do primeiro OWNER.')
         return
       }
 
       toast({
-        title: 'Organização inicializada com sucesso!',
-        description: 'Você foi registrado como OWNER da clínica Ser Único.',
+        title: 'Clínica configurada com sucesso!',
+        description: `Bem-vindo(a), ${ownerName.trim()}. Você é o primeiro OWNER da clínica.`,
       })
       navigate('/dashboard')
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Erro inesperado no setup inicial.')
+      setErrorMsg(err?.message || 'Erro inesperado no setup inicial do OWNER.')
     } finally {
       setSubmitting(false)
     }
@@ -260,19 +303,20 @@ export default function Index() {
               </Button>
             </div>
           ) : needsBootstrap ? (
-            /* ESTADO 4: EMENDA A — Setup Inicial de OWNER */
+            /* ESTADO 4: EMENDA A — Setup Inicial de OWNER (Acessível na primeira utilização) */
             <div>
               <div className="mb-6">
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 mb-3">
                   <Crown className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Setup Inicial Controlado</span>
+                  <span>Setup Inicial Protegido</span>
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-                  Inicializar Organização
+                  Primeiro Acesso — Configuração do OWNER
                 </h2>
                 <p className="text-sm text-slate-500 mt-1">
-                  A organização <strong>{targetOrgName || 'Ser Único'}</strong> não possui OWNER
-                  ativo. Como primeiro usuário autenticado, assuma a autoridade de OWNER.
+                  A clínica <strong>{targetOrgName || 'Ser Único'}</strong> não possui nenhum
+                  proprietário (OWNER) ativo cadastrado. Registre suas credenciais oficiais para
+                  assumir o papel de OWNER.
                 </p>
               </div>
 
@@ -285,7 +329,7 @@ export default function Index() {
               <form onSubmit={handleBootstrap} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="ownerName" className="text-xs font-semibold text-slate-700">
-                    Seu nome completo <span className="text-red-500">*</span>
+                    Nome completo do Proprietário/Gestor <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="ownerName"
@@ -298,33 +342,105 @@ export default function Index() {
                   />
                 </div>
 
-                <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-900">
-                  <strong>Invariante de Segurança:</strong> O bootstrap é de uso único (single-use).
-                  Após esta confirmação, novos bootstraps serão permanentemente negados pelo banco
-                  de dados.
+                {!user && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="ownerEmail" className="text-xs font-semibold text-slate-700">
+                        E-mail de acesso oficial <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="relative">
+                        <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                        <Input
+                          id="ownerEmail"
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="vitortati@hotmail.com"
+                          className="h-11 pl-9 border-slate-200 focus-visible:ring-teal-600"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="ownerPassword"
+                        className="text-xs font-semibold text-slate-700"
+                      >
+                        Definir Senha mestra (mín. 6 caracteres){' '}
+                        <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="relative">
+                        <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                        <Input
+                          id="ownerPassword"
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="h-11 pl-9 border-slate-200 focus-visible:ring-teal-600"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="ownerConfirmPassword"
+                        className="text-xs font-semibold text-slate-700"
+                      >
+                        Confirmar Senha <span className="text-red-500">*</span>
+                      </Label>
+                      <div className="relative">
+                        <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                        <Input
+                          id="ownerConfirmPassword"
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="h-11 pl-9 border-slate-200 focus-visible:ring-teal-600"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-lg text-xs text-amber-900 leading-relaxed">
+                  <strong>Invariante de Segurança:</strong> O bootstrap é estritamente de uso único
+                  (single-use). Assim que você for registrado, esta tela se tornará permanentemente
+                  inacessível no banco de dados e novos cadastros de OWNER serão bloqueados.
                 </div>
 
                 <Button
                   type="submit"
                   disabled={submitting}
-                  className="w-full h-11 bg-teal-700 hover:bg-teal-800 text-white font-semibold flex items-center justify-center gap-2"
+                  className="w-full h-11 bg-teal-700 hover:bg-teal-800 text-white font-semibold flex items-center justify-center gap-2 shadow-md shadow-teal-700/20"
                 >
                   {submitting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Inicializando OWNER...</span>
+                      <span>Configurando OWNER...</span>
                     </>
                   ) : (
                     <>
                       <Crown className="w-4 h-4" />
-                      <span>Confirmar como OWNER</span>
+                      <span>Registrar e Ativar como OWNER</span>
                     </>
                   )}
                 </Button>
 
-                <Button type="button" variant="ghost" onClick={logout} className="w-full text-xs">
-                  Cancelar e sair
-                </Button>
+                {user && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={logout}
+                    className="w-full text-xs text-slate-500"
+                  >
+                    Cancelar e sair
+                  </Button>
+                )}
               </form>
             </div>
           ) : (
