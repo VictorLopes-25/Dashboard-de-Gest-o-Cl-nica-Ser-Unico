@@ -73,7 +73,7 @@ describe('Stage 4D & 4E: Homes e Cadência Recorrente por Função', () => {
     const thresholdConfigs = await fetchThresholdConfigs()
     const thresholds: Record<string, number> = {}
     for (const c of thresholdConfigs) {
-      thresholds[c.thresholdKey] = Number(c.thresholdValue)
+      thresholds[c.key] = Number(c.value)
     }
     const today = new Date().toISOString().slice(0, 10)
 
