@@ -21,6 +21,22 @@ export async function getOrganizationId(): Promise<string> {
   }
 
   if (!data?.id) {
+    // Tentar via get_auth_state (função SECURITY DEFINER)
+    try {
+      const { data: authState } = await supabase.rpc('get_auth_state')
+      const stateObj = authState as any
+      if (stateObj?.person?.organization_id) {
+        cachedOrgId = stateObj.person.organization_id
+        return cachedOrgId
+      }
+      if (stateObj?.target_org_id) {
+        cachedOrgId = stateObj.target_org_id
+        return cachedOrgId
+      }
+    } catch {
+      // fallback
+    }
+
     // Tenta fallback para primeira organização se não encontrar pelo nome exato
     const { data: firstOrg, error: firstError } = await supabase
       .from('organizations')
@@ -28,12 +44,15 @@ export async function getOrganizationId(): Promise<string> {
       .limit(1)
       .maybeSingle()
 
-    if (firstError || !firstOrg?.id) {
-      throw new Error('Organização Ser Único não encontrada no Supabase.')
+    if (firstOrg?.id) {
+      cachedOrgId = firstOrg.id
+      return firstOrg.id
     }
 
-    cachedOrgId = firstOrg.id
-    return firstOrg.id
+    // Fallback padrão da clínica Ser Único se o usuário atual ainda não tiver leitura via RLS
+    const fallbackOrgId = 'a0000000-0000-0000-0000-000000000001'
+    cachedOrgId = fallbackOrgId
+    return fallbackOrgId
   }
 
   cachedOrgId = data.id

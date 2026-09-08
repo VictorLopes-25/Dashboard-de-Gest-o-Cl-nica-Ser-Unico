@@ -45,7 +45,8 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 
 export default function Colaboradores() {
-  const { collaborators, roles, addCollaborator, updateCollaborator, deleteCollaborator } = useApp()
+  const { collaborators, roles, addCollaborator, updateCollaborator, deleteCollaborator, isOwner } =
+    useApp()
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editingColab, setEditingColab] = useState<Collaborator | null>(null)
@@ -182,13 +183,15 @@ export default function Colaboradores() {
           </p>
         </div>
 
-        <Button
-          onClick={handleOpenCreate}
-          className="bg-teal-700 hover:bg-teal-800 text-white font-medium shadow-xs gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Novo colaborador</span>
-        </Button>
+        {isOwner && (
+          <Button
+            onClick={handleOpenCreate}
+            className="bg-teal-700 hover:bg-teal-800 text-white font-medium shadow-xs gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Novo colaborador</span>
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -266,26 +269,28 @@ export default function Colaboradores() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleOpenEdit(colab)}
-                      className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50"
-                      title="Editar colaborador"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setColabToDelete(colab)}
-                      className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                      title="Excluir colaborador"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  {isOwner && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenEdit(colab)}
+                        className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50"
+                        title="Editar colaborador"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setColabToDelete(colab)}
+                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                        title="Excluir colaborador"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Contact Data */}

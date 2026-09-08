@@ -51,10 +51,17 @@ export default function Layout() {
   const capitalizedDate =
     currentDateFormatted.charAt(0).toUpperCase() + currentDateFormatted.slice(1)
 
+  const { isOwner, switchRoleContext } = useApp()
+
   const handleLogout = () => {
     logout()
     navigate('/')
   }
+
+  // Funções disponíveis para o usuário alternar contexto
+  const availableRoles = isOwner
+    ? roles
+    : roles.filter((r) => currentUser?.allowedRoleIds?.includes(r.id))
 
   const roleData = roles.find((r) => r.id === currentUser?.roleId)
   const roleColor = roleData?.color || currentUser?.roleColor || '#0F766E'
@@ -206,9 +213,9 @@ export default function Layout() {
 
           <button
             onClick={handleLogout}
-            title="Trocar usuário"
+            title="Sair do sistema"
             className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition shrink-0"
-            aria-label="Trocar usuário"
+            aria-label="Sair do sistema"
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -260,26 +267,49 @@ export default function Layout() {
             </span>
 
             <div className="flex items-center gap-2">
-              <span
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold shadow-2xs border"
-                style={{
-                  backgroundColor: roleBgLight,
-                  color: roleTextColor,
-                  borderColor: roleColor + '40',
-                }}
-              >
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: roleColor }} />
-                <span>{currentUser.roleName}</span>
-              </span>
+              {currentUser.isOwner && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300">
+                  <Sparkles className="w-3 h-3 text-amber-600" /> OWNER
+                </span>
+              )}
+
+              {/* Seletor contextual seguro de função */}
+              {availableRoles.length > 1 ? (
+                <select
+                  value={currentUser.roleId}
+                  onChange={(e) => switchRoleContext(e.target.value)}
+                  className="text-xs font-semibold px-2.5 py-1 rounded-lg border border-slate-200 bg-white shadow-2xs cursor-pointer focus:ring-teal-600 focus:outline-none"
+                  style={{ color: roleTextColor }}
+                >
+                  {availableRoles.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      Função: {r.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold shadow-2xs border"
+                  style={{
+                    backgroundColor: roleBgLight,
+                    color: roleTextColor,
+                    borderColor: roleColor + '40',
+                  }}
+                >
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: roleColor }} />
+                  <span>{currentUser.roleName}</span>
+                </span>
+              )}
 
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleLogout}
                 className="hidden lg:flex text-xs text-slate-500 hover:text-red-600 hover:bg-red-50 h-8 gap-1.5"
+                title="Encerrar sessão"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span>Trocar</span>
+                <span>Sair</span>
               </Button>
             </div>
           </div>

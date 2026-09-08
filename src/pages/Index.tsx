@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/context/AuthContext'
 import { useApp } from '@/context/AppContext'
 import { useToast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
@@ -13,71 +14,107 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  CheckCircle2,
-  Users,
-  Layers,
-  Sparkles,
   ArrowRight,
   ShieldCheck,
   CalendarCheck,
-  UserCheck,
+  Users,
+  Layers,
+  Crown,
+  Lock,
+  Mail,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 
 export default function Index() {
   const navigate = useNavigate()
-  const { roles, setCurrentUser } = useApp()
+  const {
+    user,
+    resolvedPerson,
+    needsBootstrap,
+    targetOrgName,
+    login,
+    logout,
+    bootstrapOwner,
+    loading: authLoading,
+  } = useAuth()
+  const { roles, currentUser, switchRoleContext } = useApp()
   const { toast } = useToast()
 
-  const [name, setName] = useState('')
+  // Form states
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [ownerName, setOwnerName] = useState('')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  // Contextual role selection when authenticated
   const [selectedRoleId, setSelectedRoleId] = useState('')
-  const [errorName, setErrorName] = useState('')
-  const [errorRole, setErrorRole] = useState('')
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Redireciona para /dashboard se já estiver autenticado e com função definida
+  useEffect(() => {
+    if (user && resolvedPerson && resolvedPerson.active && currentUser) {
+      navigate('/dashboard')
+    }
+  }, [user, resolvedPerson, currentUser, navigate])
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    setErrorMsg('')
 
-    let hasError = false
-    if (!name.trim()) {
-      setErrorName('Por favor, informe seu nome completo.')
-      hasError = true
-    } else {
-      setErrorName('')
+    if (!email.trim() || !password) {
+      setErrorMsg('Informe seu e-mail e senha cadastrados.')
+      return
     }
 
-    if (!selectedRoleId) {
-      setErrorRole('Por favor, selecione a função que você exercerá hoje.')
-      hasError = true
-    } else {
-      setErrorRole('')
+    setSubmitting(true)
+    try {
+      const res = await login(email.trim(), password)
+      if (res.error) {
+        setErrorMsg('Credenciais inválidas. Verifique seu e-mail e senha.')
+        return
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Falha na autenticação.')
+    } finally {
+      setSubmitting(false)
     }
-
-    if (hasError) return
-
-    const role = roles.find((r) => r.id === selectedRoleId)
-    if (!role) return
-
-    const authUser = {
-      name: name.trim(),
-      roleId: role.id,
-      roleName: role.name,
-      roleColor: role.color,
-    }
-
-    setCurrentUser(authUser)
-    toast({
-      title: `Bem-vindo(a), ${authUser.name}!`,
-      description: `Acesso realizado com a função: ${role.name}.`,
-    })
-    navigate('/dashboard')
   }
 
-  // Quick helper to fill demo profiles
-  const fillDemoUser = (demoName: string, roleId: string) => {
-    setName(demoName)
-    setSelectedRoleId(roleId)
-    setErrorName('')
-    setErrorRole('')
+  const handleBootstrap = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setErrorMsg('')
+
+    if (!ownerName.trim()) {
+      setErrorMsg('Por favor, informe seu nome completo de proprietário/administrador.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const res = await bootstrapOwner(ownerName.trim())
+      if (!res.success) {
+        setErrorMsg(res.error || 'Falha ao concluir o bootstrap de OWNER.')
+        return
+      }
+
+      toast({
+        title: 'Organização inicializada com sucesso!',
+        description: 'Você foi registrado como OWNER da clínica Ser Único.',
+      })
+      navigate('/dashboard')
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Erro inesperado no setup inicial.')
+    } finally {
+      setSubmitting(false)
+    }
   }
+
+  // Se a pessoa autenticada está inativa
+  const isInactivePerson = user && resolvedPerson && !resolvedPerson.active
+
+  // Se a pessoa autenticada não possui cadastro de person e a org já tem OWNER (acesso negado)
+  const isUnlinkedPerson = user && !resolvedPerson && !needsBootstrap
 
   return (
     <div className="min-h-screen w-full flex flex-col md:flex-row bg-[#F6F8F7]">
@@ -97,7 +134,7 @@ export default function Index() {
               <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
                 Ser Único
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-500/30 text-teal-200 border border-teal-400/30">
-                  ERP + CRM
+                  ERP + CRM Seguro
                 </span>
               </h1>
               <p className="text-teal-200 text-sm font-medium">
@@ -107,9 +144,9 @@ export default function Index() {
           </div>
 
           <p className="text-teal-100/90 text-sm lg:text-base max-w-lg mt-4 leading-relaxed">
-            Plataforma interna integrada de gestão operacional e comercial orientada a{' '}
-            <strong className="text-white font-semibold">funções da empresa</strong>, garantindo
-            continuidade, excelência no acolhimento e alta taxa de conversão.
+            Plataforma interna com isolamento estrito de tenant (RLS), autoridade organizacional de{' '}
+            <strong className="text-white font-semibold">OWNER</strong> e rotinas operacionais
+            orientadas a <strong className="text-white font-semibold">funções</strong> da empresa.
           </p>
         </div>
 
@@ -124,8 +161,8 @@ export default function Index() {
                 ERP: rotinas e tarefas por função
               </h2>
               <p className="text-xs text-teal-200/80 leading-relaxed">
-                Checklists diários, recorrências inteligentes e controle de execução independentes
-                de quem assume o turno.
+                Checklists diários, recorrências inteligentes e controle de execução com isolamento
+                no banco de dados.
               </p>
             </div>
           </div>
@@ -136,11 +173,10 @@ export default function Index() {
             </div>
             <div>
               <h2 className="text-sm font-semibold text-white">
-                CRM: relacionamento com leads do início ao fechamento
+                CRM: funil e Central do CRC integrado
               </h2>
               <p className="text-xs text-teal-200/80 leading-relaxed">
-                Funil em 6 etapas, follow-ups pontuais, histórico de contatos e scripts padronizados
-                para o CRC.
+                Relacionamento de leads, histórico de contatos e sincronização direta com a agenda.
               </p>
             </div>
           </div>
@@ -150,56 +186,20 @@ export default function Index() {
               <Layers className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-white">
-                Cadastros flexíveis de funções, colaboradores e dentistas
-              </h2>
+              <h2 className="text-sm font-semibold text-white">Segurança RLS e Governança OWNER</h2>
               <p className="text-xs text-teal-200/80 leading-relaxed">
-                Atribuição flexível muitos-para-muitos e cadastro de corpo clínico especializado.
+                Atribuições de postos e mutações organizacionais restritas a OWNER via banco de
+                dados.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Decorative Floating Cards in Footer */}
+        {/* Security Note Footer */}
         <div className="relative z-10 pt-4 border-t border-teal-600/40">
-          <div className="grid grid-cols-2 gap-3">
-            {/* Mini Task Card */}
-            <div className="bg-teal-950/60 backdrop-blur-md rounded-xl p-3 border border-teal-500/30 shadow-md">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-300 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Tarefa do Dia
-                </span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/30 text-purple-200 font-semibold">
-                  CRC
-                </span>
-              </div>
-              <p className="text-xs text-white font-medium line-clamp-1">
-                Follow-up dos leads do dia — CRC
-              </p>
-              <div className="flex items-center justify-between mt-2 text-[10px] text-teal-300/80">
-                <span>Diária</span>
-                <span className="text-emerald-300 font-medium">100% pronta</span>
-              </div>
-            </div>
-
-            {/* Mini Lead Card */}
-            <div className="bg-teal-950/60 backdrop-blur-md rounded-xl p-3 border border-teal-500/30 shadow-md">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-teal-300 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-amber-300" /> Novo Lead
-                </span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-200 font-semibold">
-                  Implantes
-                </span>
-              </div>
-              <p className="text-xs text-white font-medium line-clamp-1">
-                Maria — Interesse em Implantes
-              </p>
-              <div className="flex items-center justify-between mt-2 text-[10px] text-teal-300/80">
-                <span>Instagram</span>
-                <span className="text-amber-300 font-medium">Follow-up hoje</span>
-              </div>
-            </div>
+          <div className="flex items-center gap-2 text-xs text-teal-200/90">
+            <ShieldCheck className="w-4 h-4 text-emerald-300 shrink-0" />
+            <span>Autenticação real via Supabase Auth • RLS Tenant Isolation ativado</span>
           </div>
         </div>
       </div>
@@ -218,140 +218,200 @@ export default function Index() {
             </div>
           </div>
 
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Acessar o sistema</h2>
-            <p className="text-sm text-slate-500 mt-1">
-              Entre com seu nome e selecione a função que você está exercendo hoje.
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="userName" className="text-xs font-semibold text-slate-700">
-                Nome completo <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="userName"
-                type="text"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value)
-                  if (errorName) setErrorName('')
-                }}
-                placeholder="Ex.: Paula Rocha"
-                className="h-11 border-slate-200 focus-visible:ring-teal-600"
-              />
-              {errorName && <p className="text-xs text-red-500">{errorName}</p>}
+          {/* ESTADO 1: Loading da sessão */}
+          {authLoading ? (
+            <div className="py-12 flex flex-col items-center justify-center text-slate-500 space-y-3">
+              <Loader2 className="w-8 h-8 animate-spin text-teal-700" />
+              <p className="text-xs">Verificando credenciais e permissões...</p>
             </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="roleSelect" className="text-xs font-semibold text-slate-700">
-                Função <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={selectedRoleId}
-                onValueChange={(val) => {
-                  setSelectedRoleId(val)
-                  if (errorRole) setErrorRole('')
-                }}
-              >
-                <SelectTrigger
-                  id="roleSelect"
-                  className="h-11 border-slate-200 focus:ring-teal-600"
-                >
-                  <SelectValue placeholder="Selecione sua função atual" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: role.color }}
-                        />
-                        <span className="font-medium text-slate-800">{role.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errorRole && <p className="text-xs text-red-500">{errorRole}</p>}
+          ) : isInactivePerson ? (
+            /* ESTADO 2: Pessoa Inativa */
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-800 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-sm text-red-900">
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                  <span>Acesso Bloqueado</span>
+                </div>
+                <p className="text-xs leading-relaxed">
+                  Seu cadastro de colaborador está inativo no sistema. Entre em contato com o OWNER
+                  da clínica para reativação.
+                </p>
+              </div>
+              <Button variant="outline" onClick={logout} className="w-full">
+                Encerrar sessão
+              </Button>
             </div>
-
-            <Button
-              type="submit"
-              className="w-full h-11 bg-teal-700 hover:bg-teal-800 text-white font-semibold transition-colors shadow-md shadow-teal-700/20 flex items-center justify-center gap-2 mt-2"
-            >
-              <span>Entrar</span>
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </form>
-
-          {/* System philosophy note */}
-          <div className="mt-6 p-3 rounded-lg bg-teal-50/80 border border-teal-100 flex items-start gap-2.5">
-            <ShieldCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
-            <p className="text-xs text-teal-900/90 leading-relaxed">
-              <strong className="font-semibold text-teal-950">Nota de arquitetura:</strong> As
-              tarefas e rotinas são organizadas por <strong>função</strong>, não por pessoa.
-            </p>
-          </div>
-
-          {/* Quick Demo Selector */}
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2.5">
-              Atalhos de demonstração rápida:
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {roles.find((r) => r.name.toLowerCase().includes('gerência')) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const r = roles.find((role) => role.name.toLowerCase().includes('gerência'))
-                    if (r) fillDemoUser('Marcos Silveira', r.id)
-                  }}
-                  className="text-xs px-2.5 py-1 rounded-md bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 font-medium flex items-center gap-1 transition"
-                >
-                  <UserCheck className="w-3 h-3" /> Marcos (Gerência)
-                </button>
-              )}
-              {roles.find((r) => r.name.toLowerCase().includes('crc')) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const r = roles.find((role) => role.name.toLowerCase().includes('crc'))
-                    if (r) fillDemoUser('Paula Rocha', r.id)
-                  }}
-                  className="text-xs px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 font-medium flex items-center gap-1 transition"
-                >
-                  <UserCheck className="w-3 h-3" /> Paula (CRC)
-                </button>
-              )}
-              {roles.find((r) => r.name.toLowerCase().includes('concierge')) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const r = roles.find((role) => role.name.toLowerCase().includes('concierge'))
-                    if (r) fillDemoUser('Camila Albuquerque', r.id)
-                  }}
-                  className="text-xs px-2.5 py-1 rounded-md bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 font-medium flex items-center gap-1 transition"
-                >
-                  <UserCheck className="w-3 h-3" /> Camila (Concierge)
-                </button>
-              )}
-              {roles.find((r) => r.name.toLowerCase().includes('dentista')) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const r = roles.find((role) => role.name.toLowerCase().includes('dentista'))
-                    if (r) fillDemoUser('Dr. Rodrigo Mendes', r.id)
-                  }}
-                  className="text-xs px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 font-medium flex items-center gap-1 transition"
-                >
-                  <UserCheck className="w-3 h-3" /> Dr. Rodrigo (Dentista)
-                </button>
-              )}
+          ) : isUnlinkedPerson ? (
+            /* ESTADO 3: Usuário sem person vinculada em org com OWNER existente */
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-sm text-amber-900">
+                  <AlertCircle className="w-5 h-5 text-amber-600" />
+                  <span>Sem Vínculo Operacional</span>
+                </div>
+                <p className="text-xs leading-relaxed">
+                  Sua conta de e-mail (<strong>{user?.email}</strong>) foi autenticada, mas ainda
+                  não está vinculada a um colaborador ativo desta clínica. Solicite ao OWNER da
+                  clínica a criação do seu cadastro.
+                </p>
+              </div>
+              <Button variant="outline" onClick={logout} className="w-full">
+                Sair
+              </Button>
             </div>
-          </div>
+          ) : needsBootstrap ? (
+            /* ESTADO 4: EMENDA A — Setup Inicial de OWNER */
+            <div>
+              <div className="mb-6">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 mb-3">
+                  <Crown className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Setup Inicial Controlado</span>
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+                  Inicializar Organização
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  A organização <strong>{targetOrgName || 'Ser Único'}</strong> não possui OWNER
+                  ativo. Como primeiro usuário autenticado, assuma a autoridade de OWNER.
+                </p>
+              </div>
+
+              {errorMsg && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
+                  {errorMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleBootstrap} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="ownerName" className="text-xs font-semibold text-slate-700">
+                    Seu nome completo <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="ownerName"
+                    type="text"
+                    value={ownerName}
+                    onChange={(e) => setOwnerName(e.target.value)}
+                    placeholder="Ex.: Vitor Tati"
+                    className="h-11 border-slate-200 focus-visible:ring-teal-600"
+                    required
+                  />
+                </div>
+
+                <div className="p-3 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-900">
+                  <strong>Invariante de Segurança:</strong> O bootstrap é de uso único (single-use).
+                  Após esta confirmação, novos bootstraps serão permanentemente negados pelo banco
+                  de dados.
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full h-11 bg-teal-700 hover:bg-teal-800 text-white font-semibold flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Inicializando OWNER...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Crown className="w-4 h-4" />
+                      <span>Confirmar como OWNER</span>
+                    </>
+                  )}
+                </Button>
+
+                <Button type="button" variant="ghost" onClick={logout} className="w-full text-xs">
+                  Cancelar e sair
+                </Button>
+              </form>
+            </div>
+          ) : (
+            /* ESTADO 5: Formulário de Login Seguro Email + Senha */
+            <div>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+                  Acessar o sistema
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Entre com suas credenciais de acesso autenticado da clínica.
+                </p>
+              </div>
+
+              {errorMsg && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
+                  {errorMsg}
+                </div>
+              )}
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-xs font-semibold text-slate-700">
+                    E-mail institucional <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="vitortati@hotmail.com"
+                      className="h-11 pl-9 border-slate-200 focus-visible:ring-teal-600"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="password" className="text-xs font-semibold text-slate-700">
+                    Senha <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="h-11 pl-9 border-slate-200 focus-visible:ring-teal-600"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full h-11 bg-teal-700 hover:bg-teal-800 text-white font-semibold transition-colors shadow-md shadow-teal-700/20 flex items-center justify-center gap-2 mt-2"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Autenticando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Entrar</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </Button>
+              </form>
+
+              {/* System security note */}
+              <div className="mt-6 p-3 rounded-lg bg-teal-50/80 border border-teal-100 flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+                <p className="text-xs text-teal-900/90 leading-relaxed">
+                  <strong className="font-semibold text-teal-950">Acesso Restrito:</strong> Sessões
+                  são validadas via Supabase Auth e protegidas por Row Level Security no banco de
+                  dados.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

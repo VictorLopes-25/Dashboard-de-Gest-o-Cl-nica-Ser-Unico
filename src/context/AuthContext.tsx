@@ -1,82 +1,203 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
+import { getOrganizationId } from '@/services/organizationService'
 
-/*
- * AuthContext — sessão do usuário autenticado no Supabase Auth.
- *
- * O AppContext cuida dos dados do negócio (funções, colaboradores, dentistas,
- * tarefas, leads e scripts). Este contexto só expõe quem está logado,
- * o estado de carregamento e as ações de entrar/sair.
- */
-
-interface AuthUser {
+export interface ResolvedPerson {
   id: string
+  organization_id: string
   name: string
-  email: string
+  auth_user_id: string
+  org_role: 'OWNER' | null
+  active: boolean
+  created_at: string
+}
+
+export interface AuthStateResponse {
+  authenticated: boolean
+  person: ResolvedPerson | null
+  active?: boolean
+  needs_bootstrap?: boolean
+  target_org_id?: string
+  target_org_name?: string
 }
 
 interface AuthContextType {
-  session: AuthUser | null
+  user: User | null
+  session: Session | null
+  resolvedPerson: ResolvedPerson | null
+  needsBootstrap: boolean
+  targetOrgId: string | null
+  targetOrgName: string | null
   loading: boolean
-  login: (email: string, password: string) => Promise<{ error: string | null }>
+  login: (
+    email: string,
+    password: string,
+  ) => Promise<{ error: string | null; needsBootstrap?: boolean }>
   logout: () => Promise<void>
+  bootstrapOwner: (ownerName: string) => Promise<{ success: boolean; error?: string }>
+  refreshAuthState: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<AuthUser | null>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
+  const [resolvedPerson, setResolvedPerson] = useState<ResolvedPerson | null>(null)
+  const [needsBootstrap, setNeedsBootstrap] = useState(false)
+  const [targetOrgId, setTargetOrgId] = useState<string | null>(null)
+  const [targetOrgName, setTargetOrgName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      const user = data.session?.user
-      if (user) {
-        setSession({
-          id: user.id,
-          name: (user.user_metadata?.full_name as string) || user.email?.split('@')[0] || 'Usuário',
-          email: user.email || '',
-        })
-      }
-      setLoading(false)
-    })
+  const resolveAuthState = useCallback(async (currentUid: string | null) => {
+    if (!currentUid) {
+      setResolvedPerson(null)
+      setNeedsBootstrap(false)
+      setTargetOrgId(null)
+      setTargetOrgName(null)
+      return
+    }
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      if (newSession?.user) {
-        setSession({
-          id: newSession.user.id,
-          name:
-            (newSession.user.user_metadata?.full_name as string) ||
-            newSession.user.email?.split('@')[0] ||
-            'Usuário',
-          email: newSession.user.email || '',
-        })
+    try {
+      const { data, error } = await supabase.rpc('get_auth_state')
+      if (error) {
+        console.error('Erro ao resolver get_auth_state:', error)
+        return
+      }
+
+      const res = data as unknown as AuthStateResponse
+      if (res?.needs_bootstrap) {
+        setNeedsBootstrap(true)
+        setResolvedPerson(null)
+        setTargetOrgId(res.target_org_id || null)
+        setTargetOrgName(res.target_org_name || null)
+      } else if (res?.person) {
+        setResolvedPerson(res.person)
+        setNeedsBootstrap(false)
+        setTargetOrgId(res.person.organization_id)
       } else {
-        setSession(null)
+        setResolvedPerson(null)
+        setNeedsBootstrap(false)
       }
-      setLoading(false)
-    })
-
-    return () => {
-      authListener.subscription.unsubscribe()
+    } catch (err) {
+      console.error('Erro ao carregar estado de identidade:', err)
     }
   }, [])
 
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      // Regra de ouro Supabase: sync only dentro do callback onAuthStateChange
+      setSession(newSession)
+      setUser(newSession?.user ?? null)
+      if (!newSession?.user) {
+        setResolvedPerson(null)
+        setNeedsBootstrap(false)
+        setLoading(false)
+      }
+    })
+
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      setSession(initialSession)
+      setUser(initialSession?.user ?? null)
+      if (initialSession?.user) {
+        resolveAuthState(initialSession.user.id).finally(() => setLoading(false))
+      } else {
+        setLoading(false)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [resolveAuthState])
+
+  // Quando o user muda (ex.: após login), resolver o person
+  useEffect(() => {
+    if (user?.id) {
+      resolveAuthState(user.id)
+    }
+  }, [user?.id, resolveAuthState])
+
   const login = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       return { error: error.message }
     }
+
+    if (data.user) {
+      setUser(data.user)
+      setSession(data.session)
+      await resolveAuthState(data.user.id)
+    }
+
     return { error: null }
   }
 
   const logout = async () => {
     await supabase.auth.signOut()
+    setUser(null)
     setSession(null)
+    setResolvedPerson(null)
+    setNeedsBootstrap(false)
+    try {
+      localStorage.removeItem('ser_unico_current_user')
+    } catch {
+      // ignore
+    }
+  }
+
+  const bootstrapOwner = async (ownerName: string) => {
+    try {
+      let orgId = targetOrgId
+      if (!orgId) {
+        orgId = await getOrganizationId()
+      }
+
+      const { data, error } = await supabase.rpc('bootstrap_owner', {
+        target_org_id: orgId,
+        owner_name: ownerName,
+      })
+
+      if (error) {
+        return { success: false, error: error.message }
+      }
+
+      // Re-resolve identidade
+      if (user?.id) {
+        await resolveAuthState(user.id)
+      }
+
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Falha ao executar bootstrap de OWNER' }
+    }
+  }
+
+  const refreshAuthState = async () => {
+    if (user?.id) {
+      await resolveAuthState(user.id)
+    }
   }
 
   return (
-    <AuthContext.Provider value={{ session, loading, login, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        resolvedPerson,
+        needsBootstrap,
+        targetOrgId,
+        targetOrgName,
+        loading,
+        login,
+        logout,
+        bootstrapOwner,
+        refreshAuthState,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

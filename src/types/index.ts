@@ -2,13 +2,19 @@
 // Tipos do domínio — Ser Único
 // ------------------------------------------------------------------
 
+export type OrgRole = 'OWNER' | null
+
 export interface AuthUser {
-  id?: string
+  id?: string // person_id
+  authUserId?: string // Supabase auth.users.id
   name: string
   email?: string
-  roleId: string
-  roleName: string
+  orgRole?: OrgRole
+  isOwner?: boolean
+  roleId: string // Current contextual function ID
+  roleName: string // Current contextual function Name
   roleColor?: string
+  allowedRoleIds?: string[] // Active function assignments of the authenticated person
 }
 
 export interface Role {

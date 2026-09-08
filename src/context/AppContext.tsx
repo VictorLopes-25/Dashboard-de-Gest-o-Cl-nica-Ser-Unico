@@ -1,10 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react'
-import {
-  INITIAL_ROLES,
-  INITIAL_COLLABORATORS,
-  INITIAL_DENTISTS,
-  getTodayDateString,
-} from '@/data/mockData'
+import { useAuth } from '@/context/AuthContext'
+import { INITIAL_ROLES, INITIAL_DENTISTS, getTodayDateString } from '@/data/mockData'
 import type {
   AuthUser,
   Role,
@@ -369,8 +365,10 @@ interface AppContextType {
   session: AuthUser | null
   currentUser: AuthUser | null
   setCurrentUser: (user: AuthUser | null) => void
+  switchRoleContext: (roleId: string) => void
   logout: () => void
   isManagerOrAdmin: boolean
+  isOwner: boolean
   loading: boolean
 
   // Dados
@@ -477,20 +475,12 @@ const DEFAULT_CURRENT_USER: AuthUser = {
 }
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUserState] = useState<AuthUser | null>(() => {
-    try {
-      const stored = localStorage.getItem('ser_unico_current_user')
-      if (stored) return JSON.parse(stored)
-    } catch {
-      // fallback
-    }
-    return DEFAULT_CURRENT_USER
-  })
-
+  const { user: authUser, resolvedPerson, logout: authLogout } = useAuth()
+  const [currentUser, setCurrentUserState] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   const [roles, setRoles] = useState<Role[]>(INITIAL_ROLES)
-  const [collaborators, setCollaborators] = useState<Collaborator[]>(INITIAL_COLLABORATORS)
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([])
   const [dentists, setDentists] = useState<Dentist[]>(INITIAL_DENTISTS)
   const [tasks, setTasks] = useState<Task[]>([])
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([])
@@ -498,6 +488,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [leads, setLeads] = useState<Lead[]>([])
   const [scripts, setScripts] = useState<Script[]>([])
   const [contactHistory, setContactHistory] = useState<ContactHistoryItem[]>([])
+
+  const isOwner = useMemo(() => {
+    return currentUser?.isOwner === true || resolvedPerson?.org_role === 'OWNER'
+  }, [currentUser, resolvedPerson])
 
   const setCurrentUser = useCallback((user: AuthUser | null) => {
     setCurrentUserState(user)
@@ -513,11 +507,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [])
 
   const logout = useCallback(() => {
+    authLogout()
     setCurrentUser(null)
-  }, [setCurrentUser])
+  }, [authLogout, setCurrentUser])
+
+  // Contextual role switch — strictly within assignments or any role for OWNER
+  const switchRoleContext = useCallback(
+    (roleId: string) => {
+      const targetRole = roles.find((r) => r.id === roleId)
+      if (!targetRole) return
+
+      setCurrentUserState((prev) => {
+        if (!prev) return prev
+        const isAllowed =
+          prev.isOwner || (prev.allowedRoleIds && prev.allowedRoleIds.includes(roleId))
+        if (!isAllowed && prev.allowedRoleIds && prev.allowedRoleIds.length > 0) {
+          console.warn('Troca de função negada: função fora dos assignments ativos do usuário.')
+          return prev
+        }
+
+        const updated: AuthUser = {
+          ...prev,
+          roleId: targetRole.id,
+          roleName: targetRole.name,
+          roleColor: targetRole.color,
+        }
+        try {
+          localStorage.setItem('ser_unico_current_user', JSON.stringify(updated))
+        } catch {
+          // ignore
+        }
+        return updated
+      })
+    },
+    [roles],
+  )
 
   const isManagerOrAdmin = useMemo(() => {
     if (!currentUser) return false
+    if (currentUser.isOwner) return true
     const name = currentUser.roleName.toLowerCase()
     return name.includes('gerência') || name.includes('administrativo') || name.includes('admin')
   }, [currentUser])
@@ -527,37 +555,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ----------------------------------------------------------------
 
   const refreshData = useCallback(async () => {
+    // Se não há usuário autenticado com pessoa resolvida, não tenta carregar tabelas protegidas
+    if (!authUser || !resolvedPerson) {
+      setLoading(false)
+      return
+    }
+
     setLoading(true)
     try {
       // 1. Buscar funções (public.functions)
       const dbFuncs = await fetchFunctions()
       const mappedRoles: Role[] = dbFuncs.map(mapFunctionToRole)
-
-      // Se o usuário ativo estiver usando uma role que não existe mais nas funções do Supabase
-      // ou se o roleId estiver desatualizado, atualiza para a função Gerência do Supabase
-      setCurrentUserState((prev) => {
-        if (!prev) return prev
-        const roleExists = mappedRoles.some((r) => r.id === prev.roleId)
-        if (!roleExists) {
-          const gerenciaRole =
-            mappedRoles.find((r) => r.name.toLowerCase().includes('gerência')) || mappedRoles[0]
-          if (gerenciaRole) {
-            const updatedUser: AuthUser = {
-              ...prev,
-              roleId: gerenciaRole.id,
-              roleName: gerenciaRole.name,
-              roleColor: gerenciaRole.color,
-            }
-            try {
-              localStorage.setItem('ser_unico_current_user', JSON.stringify(updatedUser))
-            } catch {
-              // ignore
-            }
-            return updatedUser
-          }
-        }
-        return prev
-      })
 
       // 2. Buscar pessoas (public.people)
       const dbPeople = await fetchPeople()
@@ -584,6 +592,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       setRoles(mappedRoles)
       setCollaborators(mappedCollaborators)
+
+      // 4. Sincronizar currentUser com a identidade autenticada resolvida
+      const userAssignments = personRolesMap.get(resolvedPerson.id) || []
+      const isOwnerRole = resolvedPerson.org_role === 'OWNER'
+
+      setCurrentUserState((prev) => {
+        let activeRoleId = prev?.roleId
+        // Verifica se a role atual ainda é válida nos assignments do usuário
+        const isCurrentRoleAllowed =
+          activeRoleId && (isOwnerRole || userAssignments.includes(activeRoleId))
+
+        if (!isCurrentRoleAllowed) {
+          if (userAssignments.length > 0) {
+            activeRoleId = userAssignments[0]
+          } else {
+            // Se OWNER ou sem assignment específico, usa a primeira função disponível (ou Gerência)
+            const defaultRole =
+              mappedRoles.find((r) => r.name.toLowerCase().includes('gerência')) || mappedRoles[0]
+            activeRoleId = defaultRole?.id || ''
+          }
+        }
+
+        const currentRole = mappedRoles.find((r) => r.id === activeRoleId)
+        const updated: AuthUser = {
+          id: resolvedPerson.id,
+          authUserId: authUser.id,
+          name: resolvedPerson.name,
+          email: authUser.email,
+          orgRole: resolvedPerson.org_role,
+          isOwner: isOwnerRole,
+          roleId: activeRoleId || '',
+          roleName: currentRole?.name || 'Colaborador',
+          roleColor: currentRole?.color || '#0F766E',
+          allowedRoleIds: userAssignments,
+        }
+
+        try {
+          localStorage.setItem('ser_unico_current_user', JSON.stringify(updated))
+        } catch {
+          // ignore
+        }
+        return updated
+      })
 
       // 4. Buscar tarefas do Supabase (public.tasks)
       const dbTasks = await fetchTasksService(true)
@@ -629,10 +680,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [])
 
   useEffect(() => {
-    refreshData().catch((err) => {
-      console.error('Falha na inicialização do AppContext:', err)
-    })
-  }, [refreshData])
+    if (authUser && resolvedPerson) {
+      refreshData().catch((err) => {
+        console.error('Falha na inicialização do AppContext:', err)
+      })
+    } else {
+      setCurrentUserState(null)
+      setLoading(false)
+    }
+  }, [authUser, resolvedPerson, refreshData])
 
   // Helpers
   const getLeadById = useCallback(
@@ -1441,8 +1497,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         session: currentUser,
         currentUser,
         setCurrentUser,
+        switchRoleContext,
         logout,
         isManagerOrAdmin,
+        isOwner,
         loading,
         roles,
         collaborators,

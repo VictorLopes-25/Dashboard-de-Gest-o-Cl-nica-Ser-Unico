@@ -70,7 +70,7 @@ const SPECIALTY_BADGE_STYLES: Record<string, string> = {
 }
 
 export default function Dentistas() {
-  const { dentists, addDentist, updateDentist, deleteDentist } = useApp()
+  const { dentists, addDentist, updateDentist, deleteDentist, isOwner } = useApp()
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editingDentist, setEditingDentist] = useState<Dentist | null>(null)
@@ -194,13 +194,15 @@ export default function Dentistas() {
           </p>
         </div>
 
-        <Button
-          onClick={handleOpenCreate}
-          className="bg-teal-700 hover:bg-teal-800 text-white font-medium shadow-xs gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Novo dentista</span>
-        </Button>
+        {isOwner && (
+          <Button
+            onClick={handleOpenCreate}
+            className="bg-teal-700 hover:bg-teal-800 text-white font-medium shadow-xs gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Novo dentista</span>
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -274,26 +276,28 @@ export default function Dentistas() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleOpenEdit(dentist)}
-                    className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50"
-                    title="Editar dentista"
-                  >
-                    <Pencil className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setDentistToDelete(dentist)}
-                    className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                    title="Excluir dentista"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+                {isOwner && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleOpenEdit(dentist)}
+                      className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50"
+                      title="Editar dentista"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDentistToDelete(dentist)}
+                      className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                      title="Excluir dentista"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* Phone */}

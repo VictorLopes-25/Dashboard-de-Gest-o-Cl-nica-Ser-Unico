@@ -6,6 +6,7 @@ export interface DbPerson {
   organization_id: string
   name: string
   auth_user_id: string | null
+  org_role: 'OWNER' | null
   active: boolean
   created_at: string
 }

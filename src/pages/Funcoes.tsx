@@ -101,7 +101,7 @@ const PRESET_COLORS = [
 ]
 
 export default function Funcoes() {
-  const { roles, collaborators, tasks, addRole, updateRole, deleteRole } = useApp()
+  const { roles, collaborators, tasks, addRole, updateRole, deleteRole, isOwner } = useApp()
 
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRole, setEditingRole] = useState<Role | null>(null)
@@ -197,13 +197,15 @@ export default function Funcoes() {
           </p>
         </div>
 
-        <Button
-          onClick={handleOpenCreate}
-          className="bg-teal-700 hover:bg-teal-800 text-white font-medium shadow-xs gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nova função</span>
-        </Button>
+        {isOwner && (
+          <Button
+            onClick={handleOpenCreate}
+            className="bg-teal-700 hover:bg-teal-800 text-white font-medium shadow-xs gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Nova função</span>
+          </Button>
+        )}
       </div>
 
       {/* Info Card on Philosophy */}
@@ -250,26 +252,28 @@ export default function Funcoes() {
                     <span>{role.name}</span>
                   </span>
 
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleOpenEdit(role)}
-                      className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50"
-                      title="Editar função"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setRoleToDelete(role)}
-                      className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                      title="Excluir função"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  {isOwner && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenEdit(role)}
+                        className="h-8 w-8 text-slate-500 hover:text-teal-700 hover:bg-teal-50"
+                        title="Editar função"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setRoleToDelete(role)}
+                        className="h-8 w-8 text-slate-400 hover:text-red-600 hover:bg-red-50"
+                        title="Excluir função"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Description */}
