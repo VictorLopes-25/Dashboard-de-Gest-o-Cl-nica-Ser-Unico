@@ -177,7 +177,7 @@ export default function Index() {
               <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
                 Ser Único
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-500/30 text-teal-200 border border-teal-400/30">
-                  ERP + CRM v0.0.19
+                  ERP + CRM v0.0.21
                 </span>
               </h1>
               <p className="text-teal-200 text-sm font-medium">
@@ -367,7 +367,7 @@ export default function Index() {
                           type="email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          placeholder="vitortati@hotmail.com"
+                          placeholder="victor@serunico.com.br"
                           className="h-11 pl-9 border-slate-200 focus-visible:ring-teal-600"
                           required
                         />
@@ -485,7 +485,7 @@ export default function Index() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="vitortati@hotmail.com"
+                      placeholder="victor@serunico.com.br"
                       className="h-11 pl-9 border-slate-200 focus-visible:ring-teal-600"
                       required
                     />
