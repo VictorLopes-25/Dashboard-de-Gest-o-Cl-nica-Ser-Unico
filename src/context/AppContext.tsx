@@ -232,6 +232,10 @@ function mapDbTaskToUi(t: DbTask): Task {
     completedAt: null,
     active: t.active,
     description: t.description,
+    estimatedMinutes: t.estimated_minutes ?? 15,
+    timeWindow: t.time_window ?? 'dia_todo',
+    priority: t.priority ?? 'media',
+    isRoutine: t.is_routine ?? true,
   }
 }
 
@@ -889,6 +893,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         due_date: taskData.dueDate || null,
         default_person_id: taskData.assignedCollaboratorId || null,
         active: taskData.active ?? true,
+        estimated_minutes: taskData.estimatedMinutes ?? 15,
+        time_window: taskData.timeWindow ?? 'dia_todo',
+        priority: taskData.priority ?? 'media',
+        is_routine: taskData.isRoutine ?? true,
       })
 
       const mapped = mapDbTaskToUi(created)
@@ -923,6 +931,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (updates.assignedCollaboratorId !== undefined)
         dbUpdates.default_person_id = updates.assignedCollaboratorId || null
       if (updates.active !== undefined) dbUpdates.active = updates.active
+      if (updates.estimatedMinutes !== undefined)
+        dbUpdates.estimated_minutes = updates.estimatedMinutes
+      if (updates.timeWindow !== undefined) dbUpdates.time_window = updates.timeWindow
+      if (updates.priority !== undefined) dbUpdates.priority = updates.priority
+      if (updates.isRoutine !== undefined) dbUpdates.is_routine = updates.isRoutine
 
       const updated = await updateTaskService(id, dbUpdates)
       const mapped = mapDbTaskToUi(updated)

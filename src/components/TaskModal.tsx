@@ -46,6 +46,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     taskToEdit?.assignedCollaboratorId || '',
   )
   const [dueDate, setDueDate] = useState(taskToEdit?.dueDate || getTodayDateString(0))
+  const [timeWindow, setTimeWindow] = useState<'manha' | 'tarde' | 'noite' | 'dia_todo'>(
+    taskToEdit?.timeWindow || 'dia_todo',
+  )
+  const [priority, setPriority] = useState<'baixa' | 'media' | 'alta' | 'critica'>(
+    taskToEdit?.priority || 'media',
+  )
+  const [isRoutine, setIsRoutine] = useState<boolean>(taskToEdit?.isRoutine ?? true)
 
   const [errorTitle, setErrorTitle] = useState('')
   const [errorRole, setErrorRole] = useState('')
@@ -61,12 +68,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({
         setRecurrenceDay(taskToEdit.recurrenceDay || 1)
         setAssignedCollaboratorId(taskToEdit.assignedCollaboratorId || '')
         setDueDate(taskToEdit.dueDate)
+        setTimeWindow(taskToEdit.timeWindow || 'dia_todo')
+        setPriority(taskToEdit.priority || 'media')
+        setIsRoutine(taskToEdit.isRoutine ?? true)
       } else {
         setTitle('')
         setDescription('')
         setRoleId(defaultRoleId || currentUser?.roleId || roles[0]?.id || '')
         setRecurrence('Diária')
         setRecurrenceDay(1)
+        setTimeWindow('dia_todo')
+        setPriority('media')
+        setIsRoutine(true)
         setAssignedCollaboratorId('')
         setDueDate(getTodayDateString(0))
       }
@@ -110,6 +123,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           recurrence === 'Semanal' || recurrence === 'Mensal' ? recurrenceDay : undefined,
         assignedCollaboratorId: assignedCollaboratorId || undefined,
         dueDate,
+        timeWindow,
+        priority,
+        isRoutine,
       })
     } else {
       addTask({
@@ -122,6 +138,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           recurrence === 'Semanal' || recurrence === 'Mensal' ? recurrenceDay : undefined,
         assignedCollaboratorId: assignedCollaboratorId || undefined,
         dueDate,
+        timeWindow,
+        priority,
+        isRoutine,
       })
     }
 
@@ -333,6 +352,39 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 onChange={(e) => setDueDate(e.target.value)}
                 className="h-10 text-sm"
               />
+            </div>
+          </div>
+
+          {/* Campos de Cadência: Janela do Dia e Criticidade */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Janela do Dia</Label>
+              <Select value={timeWindow} onValueChange={(val) => setTimeWindow(val as any)}>
+                <SelectTrigger className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dia_todo">Dia todo</SelectItem>
+                  <SelectItem value="manha">Manhã</SelectItem>
+                  <SelectItem value="tarde">Tarde</SelectItem>
+                  <SelectItem value="noite">Noite</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Prioridade da Rotina</Label>
+              <Select value={priority} onValueChange={(val) => setPriority(val as any)}>
+                <SelectTrigger className="h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="baixa">Baixa</SelectItem>
+                  <SelectItem value="media">Média</SelectItem>
+                  <SelectItem value="alta">Alta</SelectItem>
+                  <SelectItem value="critica">Crítica (monitorada no Exception Engine)</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

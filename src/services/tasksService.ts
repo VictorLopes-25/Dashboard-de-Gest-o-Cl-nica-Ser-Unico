@@ -3,6 +3,9 @@ import { getOrganizationId } from './organizationService'
 
 export type DbRecurrenceType = 'pontual' | 'diaria' | 'semanal' | 'mensal' | 'data_especifica'
 
+export type TimeWindow = 'manha' | 'tarde' | 'noite' | 'dia_todo'
+export type CadencePriority = 'baixa' | 'media' | 'alta' | 'critica'
+
 export interface DbTask {
   id: string
   organization_id: string
@@ -16,6 +19,10 @@ export interface DbTask {
   default_person_id: string | null
   active: boolean
   created_at: string
+  estimated_minutes?: number | null
+  time_window?: TimeWindow
+  priority?: CadencePriority
+  is_routine?: boolean
 }
 
 export interface CreateTaskPayload {
@@ -28,6 +35,10 @@ export interface CreateTaskPayload {
   due_date?: string | null
   default_person_id?: string | null
   active?: boolean
+  estimated_minutes?: number | null
+  time_window?: TimeWindow
+  priority?: CadencePriority
+  is_routine?: boolean
 }
 
 export interface UpdateTaskPayload {
@@ -40,6 +51,10 @@ export interface UpdateTaskPayload {
   due_date?: string | null
   default_person_id?: string | null
   active?: boolean
+  estimated_minutes?: number | null
+  time_window?: TimeWindow
+  priority?: CadencePriority
+  is_routine?: boolean
 }
 
 /**
@@ -100,22 +115,26 @@ export async function createTask(payload: CreateTaskPayload): Promise<DbTask> {
     throw new Error('A tarefa deve possuir uma Função ou uma Área associada.')
   }
 
-  const { data, error } = await supabase
-    .from('tasks')
-    .insert({
-      organization_id: orgId,
-      title: payload.title.trim(),
-      description: payload.description ?? null,
-      function_id: payload.function_id ?? null,
-      area_id: payload.area_id ?? null,
-      recurrence: payload.recurrence,
-      recurrence_day: payload.recurrence_day ?? null,
-      due_date: payload.due_date ?? null,
-      default_person_id: payload.default_person_id ?? null,
-      active: payload.active ?? true,
-    })
-    .select()
-    .single()
+  const insertData: any = {
+    organization_id: orgId,
+    title: payload.title.trim(),
+    description: payload.description ?? null,
+    function_id: payload.function_id ?? null,
+    area_id: payload.area_id ?? null,
+    recurrence: payload.recurrence,
+    recurrence_day: payload.recurrence_day ?? null,
+    due_date: payload.due_date ?? null,
+    default_person_id: payload.default_person_id ?? null,
+    active: payload.active ?? true,
+  }
+
+  if (payload.estimated_minutes !== undefined)
+    insertData.estimated_minutes = payload.estimated_minutes
+  if (payload.time_window !== undefined) insertData.time_window = payload.time_window
+  if (payload.priority !== undefined) insertData.priority = payload.priority
+  if (payload.is_routine !== undefined) insertData.is_routine = payload.is_routine
+
+  const { data, error } = await supabase.from('tasks').insert(insertData).select().single()
 
   if (error) {
     console.error('Erro ao criar tarefa no Supabase:', error)
@@ -132,7 +151,7 @@ export async function createTask(payload: CreateTaskPayload): Promise<DbTask> {
 export async function updateTask(id: string, updates: UpdateTaskPayload): Promise<DbTask> {
   const orgId = await getOrganizationId()
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('tasks')
     .update(updates)
     .eq('id', id)

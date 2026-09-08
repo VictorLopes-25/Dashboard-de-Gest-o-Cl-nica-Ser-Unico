@@ -262,7 +262,8 @@ export default function Tarefas() {
             <TableRow>
               <TableHead className="font-semibold text-slate-700">Título</TableHead>
               <TableHead className="font-semibold text-slate-700">Função</TableHead>
-              <TableHead className="font-semibold text-slate-700">Recorrência</TableHead>
+              <TableHead className="font-semibold text-slate-700">Recorrência & Janela</TableHead>
+              <TableHead className="font-semibold text-slate-700">Criticidade</TableHead>
               <TableHead className="font-semibold text-slate-700">Responsável Padrão</TableHead>
               <TableHead className="font-semibold text-slate-700">Início / Referência</TableHead>
               <TableHead className="font-semibold text-slate-700">Situação</TableHead>
@@ -319,24 +320,45 @@ export default function Tarefas() {
                     </TableCell>
 
                     <TableCell>
-                      <span className="text-xs px-2 py-0.5 rounded-md font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                        {task.recurrence}
-                        {task.recurrence === 'Semanal' && task.recurrenceDay && (
-                          <span className="text-[11px] text-slate-500 ml-1">
-                            (
-                            {
-                              ['', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'][
-                                task.recurrenceDay
-                              ]
-                            }
-                            )
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className="text-xs px-2 py-0.5 rounded-md font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                          {task.recurrence}
+                          {task.recurrence === 'Semanal' && task.recurrenceDay && (
+                            <span className="text-[11px] text-slate-500 ml-1">
+                              (
+                              {
+                                ['', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'][
+                                  task.recurrenceDay
+                                ]
+                              }
+                              )
+                            </span>
+                          )}
+                          {task.recurrence === 'Mensal' && task.recurrenceDay && (
+                            <span className="text-[11px] text-slate-500 ml-1">
+                              (dia {task.recurrenceDay})
+                            </span>
+                          )}
+                        </span>
+                        {task.timeWindow && task.timeWindow !== 'dia_todo' && (
+                          <span className="text-[10px] text-slate-500 capitalize">
+                            Turno: {task.timeWindow}
                           </span>
                         )}
-                        {task.recurrence === 'Mensal' && task.recurrenceDay && (
-                          <span className="text-[11px] text-slate-500 ml-1">
-                            (dia {task.recurrenceDay})
-                          </span>
-                        )}
+                      </div>
+                    </TableCell>
+
+                    <TableCell>
+                      <span
+                        className={`text-[11px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider ${
+                          task.priority === 'critica'
+                            ? 'bg-red-50 text-red-700 border border-red-200'
+                            : task.priority === 'alta'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {task.priority || 'média'}
                       </span>
                     </TableCell>
 

@@ -30,6 +30,9 @@ export interface Role {
   active?: boolean
 }
 
+export type TimeWindow = 'manha' | 'tarde' | 'noite' | 'dia_todo'
+export type CadencePriority = 'baixa' | 'media' | 'alta' | 'critica'
+
 export interface Task {
   id: string
   title: string
@@ -44,6 +47,40 @@ export interface Task {
   completedAt?: string | null
   active?: boolean
   description?: string | null
+  estimatedMinutes?: number | null
+  timeWindow?: TimeWindow
+  priority?: CadencePriority
+  isRoutine?: boolean
+}
+
+export interface FunctionCadenceLog {
+  id: string
+  organizationId: string
+  functionId: string
+  functionName?: string
+  personId?: string | null
+  personName?: string | null
+  date: string
+  expectedCount: number
+  completedCount: number
+  adherencePct: number
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface FunctionCadenceSummary {
+  functionId: string
+  functionName: string
+  functionColor: string
+  currentOccupantId?: string | null
+  currentOccupantName?: string | null
+  expectedRoutinesCount: number
+  completedRoutinesCount: number
+  adherencePct: number | null
+  hasDeviation: boolean
+  delayedCount: number
+  routines: Task[]
 }
 
 export interface AgendaItem {
@@ -354,7 +391,7 @@ export interface ManagedException {
  */
 export interface DerivedPendingItem {
   id: string
-  category: 'tarefa' | 'agenda' | 'lead'
+  category: 'tarefa' | 'agenda' | 'lead' | 'gestao'
   title: string
   expectedDate: string
   actualState: string
@@ -364,8 +401,8 @@ export interface DerivedPendingItem {
   responsiblePersonId?: string | null
   responsiblePersonName?: string | null
   managementDecisionRequired: boolean
-  severity: ExceptionSeverity
-  sourceType: 'task' | 'agenda_item' | 'lead'
+  severity: 'baixa' | 'media' | 'alta' | 'critica'
+  sourceType: 'task' | 'agenda_item' | 'lead' | 'function'
   sourceId: string
-  daysOverdue: number
+  daysOverdue?: number
 }

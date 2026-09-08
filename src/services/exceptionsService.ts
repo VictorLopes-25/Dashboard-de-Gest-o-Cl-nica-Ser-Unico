@@ -325,7 +325,7 @@ export function derivePendingItems(
 
   const derived: DerivedPendingItem[] = []
 
-  // 1. Itens da Agenda (tarefas, ocorrências, compromissos em aberto cuja due_date <= hoje)
+  // 1. Itens da Agenda (tarefas, rotinas de cadência, ocorrências em aberto cuja due_date <= hoje)
   for (const item of agendaItems) {
     if (item.status === 'aberto' && item.dueDate <= todayIso) {
       const daysOverdue = Math.max(
@@ -362,8 +362,8 @@ export function derivePendingItems(
         expectedDate: item.dueDate,
         actualState: 'Não concluído',
         reason: isPastDue
-          ? `Atrasado há ${daysOverdue} dia(s) (tolerância: ${taskDelayTolerance}d)`
-          : 'Previsto para hoje e ainda pendente',
+          ? `Rotina/Tarefa atrasada há ${daysOverdue} dia(s) (tolerância: ${taskDelayTolerance}d)`
+          : 'Rotina de cadência prevista para hoje e ainda pendente',
         responsibleFunctionId: item.functionId || 'none',
         responsibleFunctionName: roleName,
         responsiblePersonId: item.personId,
@@ -373,6 +373,37 @@ export function derivePendingItems(
         sourceType: 'agenda_item',
         sourceId: item.id,
         daysOverdue,
+      })
+    }
+  }
+
+  // 1b. Falhas recorrentes ou quebra de cadência por função
+  const overdueByFunc = new Map<string, number>()
+  for (const item of agendaItems) {
+    if (item.status === 'aberto' && item.dueDate < todayIso && item.functionId) {
+      overdueByFunc.set(item.functionId, (overdueByFunc.get(item.functionId) || 0) + 1)
+    }
+  }
+  const repeatedTolerance = thresholds.repeated_failure_count ?? 3
+  for (const [fId, count] of overdueByFunc.entries()) {
+    if (count >= repeatedTolerance) {
+      const fName = rolesMap.get(fId) || 'Função Operacional'
+      derived.push({
+        id: `pending-cadence-failure-${fId}`,
+        category: 'tarefa',
+        title: `Quebra de cadência operacional: ${count} rotinas atrasadas acumuladas`,
+        expectedDate: todayIso,
+        actualState: 'Aderência abaixo da tolerância de cadência',
+        reason: `A função acumulou ${count} rotinas/tarefas atrasadas (limiar crítico: ${repeatedTolerance})`,
+        responsibleFunctionId: fId,
+        responsibleFunctionName: fName,
+        responsiblePersonId: null,
+        responsiblePersonName: null,
+        managementDecisionRequired: true,
+        severity: count >= repeatedTolerance * 2 ? 'critica' : 'alta',
+        sourceType: 'function',
+        sourceId: fId,
+        daysOverdue: 1,
       })
     }
   }

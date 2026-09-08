@@ -7,31 +7,19 @@ import {
   acknowledgeManagementItem,
   mapDbManagementItemToUi,
 } from '@/services/managementService'
-import {
-  CheckCircle2,
-  AlertTriangle,
-  CalendarDays,
-  Plus,
-  ArrowRight,
-  TrendingUp,
-  Sparkles,
-  Circle,
-  MessageSquare,
-  Building2,
-  UserCheck,
-  Check,
-  Clock,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { computeCadenceSummary } from '@/services/cadenceService'
 import { useToast } from '@/hooks/use-toast'
-import type { AgendaItem, ManagementItem } from '@/types'
+import type { AgendaItem, ManagementItem, FunctionCadenceSummary } from '@/types'
+import { ColaboradorHome } from '@/components/homes/ColaboradorHome'
+import { GestorHome } from '@/components/homes/GestorHome'
+import { Button } from '@/components/ui/button'
+import { Eye } from 'lucide-react'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   const {
     currentUser,
+    isOwner,
     roles,
     collaborators,
     agendaItems,
@@ -44,9 +32,31 @@ export default function Dashboard() {
   const { toast } = useToast()
   const [taskModalOpen, setTaskModalOpen] = useState(false)
   const [weeklyItems, setWeeklyItems] = useState<AgendaItem[]>([])
-  const [colabFeedbacks, setColabFeedbacks] = useState<ManagementItem[]>([])
+  const [feedbacks, setFeedbacks] = useState<ManagementItem[]>([])
   const [feedbacksLoading, setFeedbacksLoading] = useState(true)
-  const [acknowledgingId, setAcknowledgingId] = useState<string | null>(null)
+  const [cadenceSummaries, setCadenceSummaries] = useState<FunctionCadenceSummary[]>([])
+  const [cadenceLoading, setCadenceLoading] = useState(true)
+
+  // Modo de visualização: gestor pode alternar entre Visão Gestor e Minha Home de Colaborador
+  const isManagerOrOwner = Boolean(
+    isOwner ||
+    currentUser?.roleName?.toLowerCase().includes('gerência') ||
+    currentUser?.roleName?.toLowerCase().includes('gerencia') ||
+    currentUser?.roleName?.toLowerCase().includes('administrativo'),
+  )
+
+  const [viewMode, setViewMode] = useState<'gestor' | 'colaborador'>(
+    isManagerOrOwner ? 'gestor' : 'colaborador',
+  )
+
+  // Atualizar viewMode se o usuário alternar contexto de função
+  useEffect(() => {
+    if (isManagerOrOwner) {
+      setViewMode('gestor')
+    } else {
+      setViewMode('colaborador')
+    }
+  }, [isManagerOrOwner, currentUser?.roleId])
 
   // Data atual no formato ISO YYYY-MM-DD local
   const todayStr = useMemo(() => {
@@ -57,7 +67,7 @@ export default function Dashboard() {
     return `${year}-${month}-${day}`
   }, [])
 
-  // Período de 7 dias para Desempenho da Semana (dos últimos 6 dias até hoje inclusive = 7 dias)
+  // Período de 7 dias para Desempenho da Semana
   const weekStartStr = useMemo(() => {
     const d = new Date()
     d.setDate(d.getDate() - 6)
@@ -67,7 +77,7 @@ export default function Dashboard() {
     return `${year}-${month}-${day}`
   }, [])
 
-  // Carregar itens reais da janela de 7 dias via loadAgendaWindow (Supabase)
+  // Carregar itens reais da janela de 7 dias via loadAgendaWindow
   useEffect(() => {
     let mounted = true
     loadAgendaWindow(weekStartStr, todayStr)
@@ -86,7 +96,7 @@ export default function Dashboard() {
   }, [weekStartStr, todayStr, loadAgendaWindow, agendaItems])
 
   // Carregar Comunicados e Feedbacks direcionados ao colaborador / função
-  const loadColabFeedbacks = useCallback(async () => {
+  const loadFeedbacks = useCallback(async () => {
     if (!currentUser) return
     setFeedbacksLoading(true)
     try {
@@ -95,7 +105,6 @@ export default function Dashboard() {
       const functionsMap = new Map(roles.map((r) => [r.id, r.name]))
       const mapped = dbItems.map((i) => mapDbManagementItemToUi(i, peopleMap, functionsMap))
 
-      // Filtrar para home do colaborador: SHARED_WITH_EMPLOYEE dele OU FUNCTION_VISIBLE da sua função
       const relevant = mapped.filter((item) => {
         if (item.visibilityLevel === 'SHARED_WITH_EMPLOYEE') {
           return item.targetPersonId === currentUser.id
@@ -111,36 +120,48 @@ export default function Dashboard() {
         return false
       })
 
-      setColabFeedbacks(relevant)
+      setFeedbacks(relevant)
     } catch (err) {
-      console.error('Falha ao carregar comunicados/feedbacks do colaborador:', err)
+      console.error('Falha ao carregar comunicados/feedbacks:', err)
     } finally {
       setFeedbacksLoading(false)
     }
   }, [currentUser, collaborators, roles])
 
+  // Carregar Resumo de Cadência por Função
+  const loadCadence = useCallback(async () => {
+    setCadenceLoading(true)
+    try {
+      const summaries = await computeCadenceSummary(todayStr)
+      setCadenceSummaries(summaries)
+    } catch (err) {
+      console.warn('Falha ao calcular cadência:', err)
+    } finally {
+      setCadenceLoading(false)
+    }
+  }, [todayStr])
+
   useEffect(() => {
-    loadColabFeedbacks()
-  }, [loadColabFeedbacks])
+    loadFeedbacks()
+    loadCadence()
+  }, [loadFeedbacks, loadCadence])
 
   // Ação de confirmar leitura / reconhecimento de feedback pelo colaborador
   const handleAcknowledge = async (itemId: string) => {
-    setAcknowledgingId(itemId)
     try {
       await acknowledgeManagementItem(itemId)
       toast({
         title: 'Leitura confirmada',
-        description: 'Você confirmou a leitura e reconhecimento deste feedback.',
+        description: 'Você confirmou a leitura e reconhecimento deste comunicado/feedback.',
       })
-      await loadColabFeedbacks()
+      await loadFeedbacks()
     } catch (err: any) {
       toast({
         title: 'Falha ao confirmar leitura',
         description: err?.message || 'Erro inesperado.',
         variant: 'destructive',
       })
-    } finally {
-      setAcknowledgingId(null)
+      throw err
     }
   }
 
@@ -162,38 +183,34 @@ export default function Dashboard() {
   const capitalizedDate =
     currentDateFormatted.charAt(0).toUpperCase() + currentDateFormatted.slice(1)
 
-  // Função ativa atual segundo o mecanismo do app
   const userRole = roles.find((r) => r.id === currentUser?.roleId)
   const userRoleId = currentUser?.roleId || ''
 
-  // -------------------------------------------------------------------------
-  // REGRAS DE NEGÓCIO: TOP KPIs REAIS DE agenda_items (sem mock fallback)
-  // -------------------------------------------------------------------------
-  // 1. "Tarefas de hoje": type='tarefa', due_date=CURRENT_DATE, status <> 'cancelado'
+  // 1. "Tarefas de hoje"
   const todayTaskItems = useMemo(() => {
     return agendaItems.filter(
       (i) => i.type === 'tarefa' && i.dueDate === todayStr && i.status !== 'cancelado',
     )
   }, [agendaItems, todayStr])
 
-  // 2. "Concluídas hoje": as concluídas de hoje (type='tarefa', due_date=CURRENT_DATE, status='concluido')
+  // 2. "Concluídas hoje"
   const completedTodayTasks = useMemo(() => {
     return todayTaskItems.filter((i) => i.status === 'concluido')
   }, [todayTaskItems])
 
-  // 3. "Atrasadas": status='aberto' AND due_date < CURRENT_DATE
+  // 3. "Atrasadas gerais"
   const overdueTasks = useMemo(() => {
     return overdueAgendaItems.filter((i) => i.status === 'aberto' && i.dueDate < todayStr)
   }, [overdueAgendaItems, todayStr])
 
-  // 4. "Follow-ups de hoje" (Regra Stage 2C): type='follow_up', due_date=CURRENT_DATE, status='aberto'
+  // 4. "Follow-ups de hoje"
   const todayFollowUps = useMemo(() => {
     return agendaItems.filter(
       (i) => i.type === 'follow_up' && i.dueDate === todayStr && i.status === 'aberto',
     )
   }, [agendaItems, todayStr])
 
-  // Minhas tarefas de hoje: agenda da função do usuário ativo atual (abertas e concluídas)
+  // Minhas tarefas de hoje (escopo estrito da função ativa atual)
   const myTasks = useMemo(() => {
     return agendaItems.filter((i) => {
       if (i.type !== 'tarefa') return false
@@ -203,642 +220,95 @@ export default function Dashboard() {
     })
   }, [agendaItems, userRoleId, todayStr])
 
-  // Nome do colaborador
-  const getCollaboratorName = (id?: string) => {
-    if (!id) return null
-    return collaborators.find((c) => c.id === id)?.name
-  }
+  // Minhas tarefas atrasadas da função ativa
+  const myOverdueTasks = useMemo(() => {
+    return overdueAgendaItems.filter((i) => {
+      if (i.status !== 'aberto') return false
+      if (userRoleId && i.functionId && i.functionId !== userRoleId) return false
+      return i.dueDate < todayStr
+    })
+  }, [overdueAgendaItems, userRoleId, todayStr])
+
+  if (!currentUser) return null
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Top Greeting Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              {greeting}, {currentUser?.name || 'Colaborador(a)'}!
+    <div>
+      {/* Alternador de Visão de Home (apenas para Gestores/OWNER para auditar como colaborador) */}
+      {isManagerOrOwner && (
+        <div className="flex items-center justify-end mb-4">
+          <div className="inline-flex items-center gap-1.5 p-1 bg-white rounded-xl border border-slate-200/80 shadow-2xs text-xs">
+            <span className="text-[11px] font-bold text-slate-400 px-2 uppercase tracking-wider">
+              Alternar Tela Inicial:
             </span>
-            <Sparkles className="w-5 h-5 text-amber-500 hidden sm:inline" />
-          </div>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            {capitalizedDate} • Visão operacional Ser Único
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div
-            className="px-3.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-2"
-            style={{
-              backgroundColor: userRole?.bgLight || '#CCFBF1',
-              color: userRole?.textColor || '#0F766E',
-              borderColor: (userRole?.color || '#0F766E') + '40',
-            }}
-          >
-            <span
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ backgroundColor: userRole?.color || '#0F766E' }}
-            />
-            <span>Função Ativa: {currentUser?.roleName}</span>
-          </div>
-
-          <Button
-            onClick={() => setTaskModalOpen(true)}
-            className="bg-teal-700 hover:bg-teal-800 text-white font-medium shadow-xs gap-1.5"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Nova tarefa</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Top KPI Statistics Cards (Restaurado KPI Follow-ups de hoje com dados reais de agenda_items) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Tarefas de hoje */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-teal-300 transition">
-          <div
-            className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-xs"
-            style={{
-              backgroundColor: userRole?.bgLight || '#CCFBF1',
-              color: userRole?.color || '#0F766E',
-            }}
-          >
-            <CalendarDays className="w-6 h-6" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {todayTaskItems.length}
-            </div>
-            <p className="text-xs font-medium text-slate-500 truncate" title="Tarefas de hoje">
-              Tarefas de hoje
-            </p>
-          </div>
-        </div>
-
-        {/* Card 2: Concluídas hoje */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-emerald-300 transition">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 shadow-xs">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {completedTodayTasks.length}
-            </div>
-            <p className="text-xs font-medium text-slate-500">Concluídas hoje</p>
-          </div>
-        </div>
-
-        {/* Card 3: Atrasadas */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-red-300 transition">
-          <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center shrink-0 shadow-xs">
-            <AlertTriangle className="w-6 h-6" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {overdueTasks.length}
-            </div>
-            <p className="text-xs font-medium text-slate-500">Atrasadas</p>
-          </div>
-        </div>
-
-        {/* Card 4: Follow-ups de hoje (Regra Stage 2C: honestidade de dados, contagem real) */}
-        <div
-          onClick={() => navigate('/agenda')}
-          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-amber-400 transition cursor-pointer group"
-        >
-          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-            <TrendingUp className="w-6 h-6" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-2xl font-bold text-slate-900 tracking-tight">
-              {todayFollowUps.length > 0 ? todayFollowUps.length : '0'}
-            </div>
-            <p className="text-xs font-medium text-slate-500 truncate" title="Follow-ups de hoje">
-              Follow-ups de hoje
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Grid: Left (Minhas Tarefas) + Right (Tarefas por Função) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Painel: Minhas tarefas de hoje (Col 5) */}
-        <div className="lg:col-span-5 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Minhas tarefas de hoje</h2>
-              <p className="text-xs text-slate-500">
-                Rotinas da função{' '}
-                <span className="font-semibold text-slate-700">{currentUser?.roleName}</span>
-              </p>
-            </div>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
-              {myTasks.filter((i) => i.status === 'aberto').length} pendentes
-            </span>
-          </div>
-
-          <div className="mt-4 space-y-2.5 flex-1 overflow-y-auto max-h-[460px] pr-1">
-            {myTasks.length === 0 ? (
-              <div className="py-12 text-center">
-                <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 mx-auto flex items-center justify-center mb-2">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
-                <p className="text-sm font-semibold text-slate-700">
-                  Nenhuma tarefa pendente hoje. 🎉
-                </p>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Tudo em dia para a função {currentUser?.roleName}!
-                </p>
-              </div>
-            ) : (
-              myTasks.map((item) => {
-                const isCompleted = item.status === 'concluido'
-                const isOverdue = item.dueDate < todayStr && item.status === 'aberto'
-                const assignedName = getCollaboratorName(item.personId || undefined)
-
-                return (
-                  <div
-                    key={item.id}
-                    className={`p-3.5 rounded-xl border transition-all ${
-                      isCompleted
-                        ? 'bg-slate-50/60 border-slate-200 opacity-75'
-                        : isOverdue
-                          ? 'bg-red-50/40 border-red-200 hover:border-red-300'
-                          : 'bg-white border-slate-200 hover:border-teal-300 shadow-2xs'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* Checkbox button */}
-                      <button
-                        type="button"
-                        onClick={() => toggleTaskCompletion(item.id)}
-                        className="mt-0.5 shrink-0 text-slate-400 hover:text-teal-700 transition"
-                        aria-label={isCompleted ? 'Desmarcar tarefa' : 'Concluir tarefa'}
-                      >
-                        {isCompleted ? (
-                          <CheckCircle2 className="w-5 h-5 text-emerald-600 fill-emerald-100" />
-                        ) : (
-                          <Circle className="w-5 h-5 hover:text-teal-600" />
-                        )}
-                      </button>
-
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className={`text-sm font-medium leading-snug ${
-                            isCompleted ? 'line-through text-slate-400' : 'text-slate-800'
-                          }`}
-                        >
-                          {item.title}
-                        </p>
-
-                        <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[11px]">
-                          {item.type !== 'tarefa' && (
-                            <span className="px-2 py-0.5 rounded-md border font-medium bg-slate-50 text-slate-600 border-slate-200 uppercase text-[10px]">
-                              {item.type}
-                            </span>
-                          )}
-
-                          {/* Overdue alert */}
-                          {isOverdue && (
-                            <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 font-bold border border-red-200">
-                              Atrasada
-                            </span>
-                          )}
-
-                          {/* Assigned Collaborator */}
-                          {assignedName && (
-                            <span className="text-slate-500 flex items-center gap-1">
-                              • 👤 {assignedName}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </div>
-
-          <div className="pt-4 mt-auto border-t border-slate-100 flex gap-2">
             <Button
-              variant="default"
               size="sm"
-              onClick={() => navigate('/agenda')}
-              className="flex-1 text-xs font-semibold bg-teal-700 hover:bg-teal-800 text-white"
+              variant={viewMode === 'gestor' ? 'default' : 'ghost'}
+              onClick={() => setViewMode('gestor')}
+              className={`h-7 text-xs font-semibold ${
+                viewMode === 'gestor'
+                  ? 'bg-teal-700 text-white'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
-              Abrir Agenda Completa
-              <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+              Visão Gestor
             </Button>
             <Button
-              variant="outline"
               size="sm"
-              onClick={() => navigate(`/tarefas?funcao=${userRoleId}`)}
-              className="text-xs font-semibold text-slate-700 hover:text-teal-800"
+              variant={viewMode === 'colaborador' ? 'default' : 'ghost'}
+              onClick={() => setViewMode('colaborador')}
+              className={`h-7 text-xs font-semibold ${
+                viewMode === 'colaborador'
+                  ? 'bg-teal-700 text-white'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
-              Modelos
+              <Eye className="w-3.5 h-3.5 mr-1" />
+              Minha Home de Colaborador
             </Button>
           </div>
         </div>
+      )}
 
-        {/* Painel: Tarefas por Função (Col 7) */}
-        <div className="lg:col-span-7 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Tarefas por função</h2>
-              <p className="text-xs text-slate-500">
-                Visão panorâmica de todas as funções ativas na clínica
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/tarefas')}
-              className="text-xs font-semibold text-teal-700 hover:text-teal-800"
-            >
-              Ver tarefas completas
-              <ArrowRight className="w-3.5 h-3.5 ml-1" />
-            </Button>
-          </div>
+      {/* Renderização Condicional da Home Específica (Stage 4D) */}
+      {viewMode === 'gestor' ? (
+        <GestorHome
+          currentUser={currentUser}
+          userRole={userRole}
+          roles={roles}
+          collaborators={collaborators}
+          leads={leads}
+          todayTaskItems={todayTaskItems}
+          completedTodayTasks={completedTodayTasks}
+          overdueTasks={overdueTasks}
+          todayFollowUps={todayFollowUps}
+          myTasks={myTasks}
+          weeklyItems={weeklyItems}
+          weekStartStr={weekStartStr}
+          todayStr={todayStr}
+          cadenceSummaries={cadenceSummaries}
+          cadenceLoading={cadenceLoading}
+          onToggleTask={toggleTaskCompletion}
+          onOpenNewTask={() => setTaskModalOpen(true)}
+          capitalizedDate={capitalizedDate}
+          greeting={greeting}
+        />
+      ) : (
+        <ColaboradorHome
+          currentUser={currentUser}
+          userRole={userRole}
+          todayTasks={myTasks}
+          overdueTasks={myOverdueTasks}
+          feedbacks={feedbacks}
+          feedbacksLoading={feedbacksLoading}
+          onToggleTask={toggleTaskCompletion}
+          onAcknowledgeFeedback={handleAcknowledge}
+          onOpenNewTask={() => setTaskModalOpen(true)}
+          capitalizedDate={capitalizedDate}
+          greeting={greeting}
+        />
+      )}
 
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 overflow-y-auto max-h-[460px] pr-1">
-            {roles.map((role) => {
-              // Regra 3: Cards de função de hoje por função
-              // total_today = COUNT agenda_items WHERE type='tarefa' AND due_date=CURRENT_DATE AND function_id=<função> AND status <> 'cancelado'
-              // completed_today = mesma query AND status='concluido'
-              const roleTodayTasks = agendaItems.filter(
-                (i) =>
-                  i.type === 'tarefa' &&
-                  i.dueDate === todayStr &&
-                  i.functionId === role.id &&
-                  i.status !== 'cancelado',
-              )
-              const totalToday = roleTodayTasks.length
-              const completedToday = roleTodayTasks.filter((i) => i.status === 'concluido').length
-
-              // Regra 3: Se total_today = 0 -> "Sem tarefas cadastradas para hoje" e percentual "—". NUNCA "100% concluído" para 0/0.
-              const progressPct =
-                totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : null
-
-              const top4Tasks = roleTodayTasks.slice(0, 4)
-
-              return (
-                <div
-                  key={role.id}
-                  onClick={() => navigate(`/tarefas?funcao=${role.id}`)}
-                  className="rounded-xl border border-slate-200/90 hover:border-slate-300 p-3.5 flex flex-col justify-between hover:shadow-md transition-all cursor-pointer group bg-slate-50/40 hover:bg-white"
-                >
-                  <div>
-                    {/* Role Header */}
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-3 h-3 rounded-full shrink-0"
-                          style={{ backgroundColor: role.color }}
-                        />
-                        <span className="text-xs font-bold text-slate-800 group-hover:text-teal-800 transition">
-                          {role.name}
-                        </span>
-                      </div>
-                      <span className="text-[11px] font-semibold text-slate-500">
-                        {totalToday > 0 ? `${completedToday}/${totalToday}` : '0/0'}
-                      </span>
-                    </div>
-
-                    {/* Progress bar (se total=0, 0%) */}
-                    <div className="mt-2.5">
-                      <Progress value={progressPct ?? 0} className="h-1.5 bg-slate-100" />
-                    </div>
-
-                    {/* Top 4 tasks list */}
-                    <div className="mt-3 space-y-1.5">
-                      {top4Tasks.length === 0 ? (
-                        <p className="text-[11px] text-slate-400 italic py-2">
-                          Sem tarefas cadastradas para hoje.
-                        </p>
-                      ) : (
-                        top4Tasks.map((t) => (
-                          <div
-                            key={t.id}
-                            className="flex items-center gap-2 text-xs text-slate-600"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleTaskCompletion(t.id)
-                            }}
-                          >
-                            {t.status === 'concluido' ? (
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            ) : (
-                              <Circle className="w-3.5 h-3.5 text-slate-300 hover:text-teal-600 shrink-0" />
-                            )}
-                            <span
-                              className={`truncate text-[11px] ${
-                                t.status === 'concluido'
-                                  ? 'line-through text-slate-400'
-                                  : 'text-slate-700'
-                              }`}
-                              title={t.title}
-                            >
-                              {t.title}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="pt-2.5 mt-2 border-t border-slate-100 text-[11px] font-medium text-slate-400 group-hover:text-teal-700 flex items-center justify-between">
-                    <span>{progressPct !== null ? `${progressPct}% concluído` : '—'}</span>
-                    <span className="flex items-center gap-0.5">
-                      Abrir <ArrowRight className="w-3 h-3" />
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Painel: Métricas Comerciais Básicas Reais (Stage 2C: leads reais, sem mocks) */}
-      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-teal-700" />
-            <div>
-              <h2 className="text-base font-bold text-slate-900">Métricas Comerciais do CRM</h2>
-              <p className="text-xs text-slate-500">
-                Funil e conversão calculados diretamente dos leads cadastrados no Supabase
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/crm')}
-            className="text-xs font-semibold text-teal-700 hover:text-teal-800"
-          >
-            Ver funil completo
-            <ArrowRight className="w-3.5 h-3.5 ml-1" />
-          </Button>
-        </div>
-
-        <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-            <p className="text-xs font-semibold text-slate-500">Total de Leads</p>
-            <p className="text-2xl font-bold text-slate-900 mt-1">{leads.length}</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">Na base ativa</p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-100">
-            <p className="text-xs font-semibold text-amber-800">Em Atendimento</p>
-            <p className="text-2xl font-bold text-amber-950 mt-1">
-              {leads.filter((l) => l.stage !== 'fechado' && l.stage !== 'perdido').length}
-            </p>
-            <p className="text-[11px] text-amber-700/80 mt-0.5">Estágios ativos</p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-emerald-50/60 border border-emerald-100">
-            <p className="text-xs font-semibold text-emerald-800">Leads Fechados</p>
-            <p className="text-2xl font-bold text-emerald-950 mt-1">
-              {leads.filter((l) => l.stage === 'fechado').length}
-            </p>
-            <p className="text-[11px] text-emerald-700/80 mt-0.5">
-              {leads.length > 0
-                ? `${Math.round((leads.filter((l) => l.stage === 'fechado').length / leads.length) * 100)}% conversão`
-                : '— conversão'}
-            </p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-teal-50/60 border border-teal-100">
-            <p className="text-xs font-semibold text-teal-800">Valor em Vendas</p>
-            <p className="text-2xl font-bold text-teal-950 mt-1">
-              {leads.filter((l) => l.stage === 'fechado' && l.saleValue).length > 0
-                ? `R$ ${leads
-                    .filter((l) => l.stage === 'fechado' && l.saleValue)
-                    .reduce((acc, curr) => acc + (curr.saleValue || 0), 0)
-                    .toLocaleString('pt-BR', {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    })}`
-                : 'R$ 0'}
-            </p>
-            <p className="text-[11px] text-teal-700/80 mt-0.5">Total contratado</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Painel: Desempenho da semana por função */}
-      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-teal-700" />
-            <div>
-              <h2 className="text-base font-bold text-slate-900">
-                Desempenho da semana por função
-              </h2>
-              <p className="text-xs text-slate-500">
-                Percentual de tarefas concluídas nos últimos 7 dias por cada função
-              </p>
-            </div>
-          </div>
-          <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
-            Últimos 7 dias
-          </span>
-        </div>
-
-        <TooltipProvider>
-          <div className="mt-6 space-y-4">
-            {roles.map((role) => {
-              // Regra 2: Desempenho semanal por função
-              // expected = COUNT agenda_items WHERE type='tarefa' AND function_id=<função> AND due_date dentro do período de 7 dias selecionado AND status <> 'cancelado'
-              // completed = mesmo conjunto AND status='concluido'
-              // expected > 0 -> performance = completed/expected*100; expected = 0 -> NULL -> UI exibe "—". NUNCA 0/0 = 100%.
-              const roleWeekItems = weeklyItems.filter(
-                (i) =>
-                  i.type === 'tarefa' &&
-                  i.functionId === role.id &&
-                  i.status !== 'cancelado' &&
-                  i.dueDate >= weekStartStr &&
-                  i.dueDate <= todayStr,
-              )
-              const expected = roleWeekItems.length
-              const completed = roleWeekItems.filter((i) => i.status === 'concluido').length
-              const performance = expected > 0 ? Math.round((completed / expected) * 100) : null
-
-              return (
-                <div key={role.id} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: role.color }}
-                      />
-                      <span className="font-semibold text-slate-800">{role.name}</span>
-                    </div>
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="font-bold text-slate-700 cursor-help">
-                          {performance !== null ? `${performance}%` : '—'}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="text-xs">
-                          {expected > 0
-                            ? `${completed} de ${expected} tarefas concluídas`
-                            : 'Sem tarefas cadastradas no período'}
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-
-                  {/* Horizontal Bar with Animation */}
-                  <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                    <div
-                      className="h-full rounded-full transition-all duration-700 ease-out"
-                      style={{
-                        width: `${performance ?? 0}%`,
-                        backgroundColor: role.color,
-                      }}
-                    />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </TooltipProvider>
-      </div>
-
-      {/* SEÇÃO STAGE 4B: Comunicados e Feedbacks da Gestão (Visível ao colaborador) */}
-      <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0">
-              <MessageSquare className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-900">
-                Comunicados e Feedbacks da Gestão
-              </h2>
-              <p className="text-xs text-slate-500">
-                Instruções operacionais da sua função e feedbacks individuais direcionados a você
-              </p>
-            </div>
-          </div>
-
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
-            {colabFeedbacks.filter((f) => !f.acknowledgedAt).length} não lidos
-          </span>
-        </div>
-
-        <div className="mt-4">
-          {feedbacksLoading ? (
-            <div className="py-8 text-center text-xs text-slate-400">
-              Carregando comunicados e feedbacks...
-            </div>
-          ) : colabFeedbacks.length === 0 ? (
-            <div className="py-8 text-center">
-              <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 mx-auto flex items-center justify-center mb-2">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <p className="text-sm font-semibold text-slate-700">
-                Nenhum comunicado ou feedback pendente.
-              </p>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Você está em dia com todas as orientações da gestão.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {colabFeedbacks.map((item) => {
-                const isAcknowledged = !!item.acknowledgedAt
-                const isShared = item.visibilityLevel === 'SHARED_WITH_EMPLOYEE'
-
-                return (
-                  <div
-                    key={item.id}
-                    className={`p-4 rounded-xl border transition flex flex-col justify-between ${
-                      isAcknowledged
-                        ? 'bg-slate-50/60 border-slate-200'
-                        : 'bg-white border-teal-200 shadow-2xs hover:border-teal-300'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            isShared
-                              ? 'bg-teal-50 text-teal-800 border border-teal-200'
-                              : 'bg-blue-50 text-blue-800 border border-blue-200'
-                          }`}
-                        >
-                          {isShared ? (
-                            <>
-                              <UserCheck className="w-3 h-3" /> Feedback Individual
-                            </>
-                          ) : (
-                            <>
-                              <Building2 className="w-3 h-3" /> Instrução da Função
-                            </>
-                          )}
-                        </span>
-
-                        <span className="text-[11px] text-slate-400">
-                          {new Date(item.createdAt).toLocaleDateString('pt-BR')}
-                        </span>
-                      </div>
-
-                      <div className="mt-3 space-y-1.5">
-                        <h3 className="text-sm font-bold text-slate-800 leading-snug">
-                          {item.title}
-                        </h3>
-                        <p className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">
-                          {item.content}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                      <span className="text-[11px] text-slate-400">
-                        Por: <strong className="text-slate-600">{item.createdByName}</strong>
-                      </span>
-
-                      {/* Botão de Reconhecimento / Status */}
-                      {isAcknowledged ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                          <Check className="w-3 h-3 text-emerald-600" />
-                          Confirmado em {new Date(item.acknowledgedAt!).toLocaleDateString('pt-BR')}
-                        </span>
-                      ) : (
-                        <Button
-                          size="sm"
-                          onClick={() => handleAcknowledge(item.id)}
-                          disabled={acknowledgingId === item.id}
-                          className="h-7 text-xs bg-teal-700 hover:bg-teal-800 text-white font-medium"
-                        >
-                          <Check className="w-3 h-3 mr-1" />
-                          {acknowledgingId === item.id ? 'Confirmando...' : 'Confirmar leitura'}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Floating Action Button for Mobile */}
-      <button
-        onClick={() => setTaskModalOpen(true)}
-        className="md:hidden fixed right-5 bottom-6 z-40 w-14 h-14 rounded-full bg-teal-700 text-white shadow-xl flex items-center justify-center hover:bg-teal-800 active:scale-95 transition"
-        aria-label="Nova tarefa"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
-
-      {/* Task Creation Modal */}
+      {/* Modal de Criação de Tarefas */}
       <TaskModal
         open={taskModalOpen}
         onOpenChange={setTaskModalOpen}
