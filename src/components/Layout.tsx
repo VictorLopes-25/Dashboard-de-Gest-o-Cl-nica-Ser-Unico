@@ -29,7 +29,7 @@ export default function Layout() {
     if (path.startsWith('/dashboard')) return 'ERP — Dashboard'
     if (path.startsWith('/agenda')) return 'ERP — Agenda Unificada'
     if (path.startsWith('/tarefas')) return 'ERP — Modelos de Tarefas'
-    if (path.startsWith('/gestao')) return 'Gestão — Gestão Clínica & Ações'
+    if (path.startsWith('/gestao')) return 'Gestão — Gestão por Exceção & Ações'
     if (path.startsWith('/crc')) return 'CRM — Central do CRC'
     if (path.startsWith('/crm/leads/')) return 'CRM — Detalhe do Lead'
     if (path.startsWith('/crm/scripts')) return 'CRM — Scripts de Atendimento'

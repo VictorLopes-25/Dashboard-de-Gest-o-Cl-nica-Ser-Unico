@@ -291,3 +291,81 @@ export interface ManagementAction {
   createdAt: string
   updatedAt: string
 }
+
+// -------------------------------------------------------------------------
+// STAGE 4C: EXCEPTION ENGINE TYPES
+// -------------------------------------------------------------------------
+
+export type ExceptionSeverity = 'baixa' | 'media' | 'alta' | 'critica'
+
+export type ExceptionStatus = 'aberta' | 'reconhecida' | 'decidida' | 'resolvida'
+
+export type ExceptionType =
+  | 'tarefa_atrasada'
+  | 'ocorrencia_perdida'
+  | 'lead_sem_followup'
+  | 'falhas_recorrentes'
+  | 'outro_desvio'
+
+export interface OrgThresholdConfig {
+  id: string
+  organizationId: string
+  key: string
+  value: number
+  unit: string
+  description: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ManagedException {
+  id: string
+  organizationId: string
+  type: ExceptionType
+  severity: ExceptionSeverity
+  title: string
+  description: string
+  entityType: 'task' | 'agenda_item' | 'lead' | 'function' | string
+  entityId?: string | null
+  responsibleFunctionId: string
+  responsibleFunctionName?: string | null
+  responsiblePersonId?: string | null
+  responsiblePersonName?: string | null
+  status: ExceptionStatus
+  recurrenceCount: number
+  firstDetectedAt: string
+  lastDetectedAt: string
+  acknowledgedAt?: string | null
+  acknowledgedByPersonId?: string | null
+  acknowledgedByName?: string | null
+  decisionText?: string | null
+  decisionByPersonId?: string | null
+  decisionByName?: string | null
+  decisionAt?: string | null
+  resolvedAt?: string | null
+  dedupKey: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Pendência do Dia DERIVADA (D3_PENDING_ITEM: DERIVED)
+ * Gerada dinamicamente via query sem persistência de tabela redundante
+ */
+export interface DerivedPendingItem {
+  id: string
+  category: 'tarefa' | 'agenda' | 'lead'
+  title: string
+  expectedDate: string
+  actualState: string
+  reason: string
+  responsibleFunctionId: string
+  responsibleFunctionName: string
+  responsiblePersonId?: string | null
+  responsiblePersonName?: string | null
+  managementDecisionRequired: boolean
+  severity: ExceptionSeverity
+  sourceType: 'task' | 'agenda_item' | 'lead'
+  sourceId: string
+  daysOverdue: number
+}
