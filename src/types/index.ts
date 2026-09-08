@@ -409,3 +409,60 @@ export interface DerivedPendingItem {
   sourceId: string
   daysOverdue?: number
 }
+
+// -------------------------------------------------------------------------
+// STAGE 4F: GOALS & METRICS TYPES
+// -------------------------------------------------------------------------
+
+export type GoalMetricKey =
+  | 'tasks_completed'
+  | 'tasks_overdue'
+  | 'routine_adherence'
+  | 'exceptions_generated'
+  | 'exceptions_resolved'
+  | 'followups_executed'
+  | 'followups_overdue'
+  | 'management_actions_completed'
+  | 'management_actions_overdue'
+
+export type GoalPeriodType = 'daily' | 'weekly' | 'monthly' | 'custom'
+
+export type GoalStatus = 'active' | 'paused' | 'closed'
+
+export interface Goal {
+  id: string
+  organizationId: string
+  responsibleFunctionId: string
+  responsibleFunctionName?: string
+  responsibleFunctionColor?: string
+  metric: GoalMetricKey
+  metricLabel: string
+  target: number
+  periodType: GoalPeriodType
+  periodStart: string // YYYY-MM-DD
+  periodEnd: string // YYYY-MM-DD
+  status: GoalStatus
+  createdBy?: string | null
+  createdByName?: string | null
+  createdAt: string
+  updatedAt: string
+  // Computed values
+  actual?: number | null
+  adherencePct?: number | null
+  evidenceSource?: string
+  statusBadge?: 'within' | 'below' | 'no_data'
+  isMultiMember?: boolean
+  activeMembersCount?: number
+}
+
+export interface GoalCalculationResult {
+  goal_id: string
+  metric: string
+  target: number
+  actual: number
+  evidence_source: string
+  period_start: string
+  period_end: string
+  period_type: string
+  status: string
+}

@@ -58,8 +58,25 @@ import {
   ListTodo,
   MessageSquare,
   ChevronDown,
+  ChevronRight,
   Info,
+  Target,
+  Pause,
+  Play,
 } from 'lucide-react'
+import {
+  fetchGoals,
+  createGoal,
+  updateGoal,
+  deleteGoal,
+  setGoalStatus,
+  calculateGoalsRpc,
+  enrichGoalForUi,
+  SUPPORTED_METRICS,
+  PERIOD_TYPE_LABELS,
+  type DbGoal,
+} from '@/services/goalsService'
+import type { Goal, GoalMetricKey, GoalPeriodType, GoalStatus } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -192,15 +209,18 @@ export default function Gestao() {
   // 2. PENDÊNCIAS DE HOJE ('pending')
   // 3. AÇÕES DE GESTÃO ('actions')
   // 4. FEEDBACKS E ORIENTAÇÕES ('feedback')
-  // Regras de Gestão em disclosure secundário ('rules')
+  // Secundárias:
+  // - Metas e Indicadores ('goals')
+  // - Regras de Gestão ('rules')
   const [activeTab, setActiveTab] = useState<
-    'attention' | 'pending' | 'actions' | 'feedback' | 'rules'
+    'attention' | 'pending' | 'actions' | 'feedback' | 'rules' | 'goals'
   >('attention')
 
   const [items, setItems] = useState<ManagementItem[]>([])
   const [actions, setActions] = useState<ManagementAction[]>([])
   const [exceptions, setExceptions] = useState<ManagedException[]>([])
   const [thresholds, setThresholds] = useState<OrgThresholdConfig[]>([])
+  const [goals, setGoals] = useState<Goal[]>([])
   const [loading, setLoading] = useState(true)
 
   // Filtros
@@ -217,10 +237,22 @@ export default function Gestao() {
   const [actionModalOpen, setActionModalOpen] = useState(false)
   const [decisionModalOpen, setDecisionModalOpen] = useState(false)
   const [thresholdModalOpen, setThresholdModalOpen] = useState(false)
+  const [goalModalOpen, setGoalModalOpen] = useState(false)
+  const [editingGoal, setEditingGoal] = useState<Goal | null>(null)
+  const [expandedGoalDetails, setExpandedGoalDetails] = useState<Record<string, boolean>>({})
   const [selectedException, setSelectedException] = useState<ManagedException | null>(null)
   const [decisionText, setDecisionText] = useState('')
   const [resolveImmediately, setResolveImmediately] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  // Formulário: Meta / Indicador (OWNER)
+  const [goalFuncId, setGoalFuncId] = useState('')
+  const [goalMetric, setGoalMetric] = useState<GoalMetricKey>('tasks_completed')
+  const [goalTarget, setGoalTarget] = useState<number>(10)
+  const [goalPeriodType, setGoalPeriodType] = useState<GoalPeriodType>('monthly')
+  const [goalPeriodStart, setGoalPeriodStart] = useState('')
+  const [goalPeriodEnd, setGoalPeriodEnd] = useState('')
+  const [goalStatusVal, setGoalStatusVal] = useState<GoalStatus>('active')
 
   // Formulário: Item de Gestão
   const [itemTitle, setItemTitle] = useState('')
@@ -298,12 +330,16 @@ export default function Gestao() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [dbItems, dbActions, dbExceptions, dbThresholds] = await Promise.all([
-        fetchManagementItems(),
-        fetchManagementActions(),
-        fetchManagedExceptions(),
-        fetchThresholdConfigs(),
-      ])
+      const [dbItems, dbActions, dbExceptions, dbThresholds, dbGoals, rpcCalcs] = await Promise.all(
+        [
+          fetchManagementItems(),
+          fetchManagementActions(),
+          fetchManagedExceptions(),
+          fetchThresholdConfigs(),
+          fetchGoals().catch(() => [] as DbGoal[]),
+          calculateGoalsRpc().catch(() => []),
+        ],
+      )
 
       const itemTitlesMap = new Map(dbItems.map((i) => [i.id, i.title]))
 
@@ -327,10 +363,25 @@ export default function Gestao() {
         decisionByName: e.decisionByPersonId ? peopleMap.get(e.decisionByPersonId) : null,
       }))
 
+      const rpcCalcsMap = new Map((rpcCalcs || []).map((c: any) => [c.goal_id, c]))
+      const enrichedGoals = dbGoals.map((g) =>
+        enrichGoalForUi(g, rpcCalcsMap.get(g.id), {
+          roles,
+          collaborators,
+          fallbackDatasets: {
+            agendaItems,
+            leads,
+            managedExceptions: dbExceptions,
+            managementActions: dbActions,
+          },
+        }),
+      )
+
       setItems(uiItems)
       setActions(uiActions)
       setExceptions(uiExceptions)
       setThresholds(dbThresholds)
+      setGoals(enrichedGoals)
     } catch (err: any) {
       console.error('Falha ao carregar dados de gestão:', err)
       toast({
@@ -341,7 +392,7 @@ export default function Gestao() {
     } finally {
       setLoading(false)
     }
-  }, [peopleMap, functionsMap, toast])
+  }, [peopleMap, functionsMap, roles, collaborators, agendaItems, leads, toast])
 
   useEffect(() => {
     loadData()
@@ -620,6 +671,159 @@ export default function Gestao() {
     }
   }
 
+  // Ações de Metas e Indicadores (OWNER)
+  const handleOpenCreateGoal = () => {
+    setEditingGoal(null)
+    setGoalFuncId(roles[0]?.id || '')
+    setGoalMetric('tasks_completed')
+    setGoalTarget(10)
+    setGoalPeriodType('monthly')
+    const today = new Date()
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10)
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+      .toISOString()
+      .slice(0, 10)
+    setGoalPeriodStart(firstDay)
+    setGoalPeriodEnd(lastDay)
+    setGoalStatusVal('active')
+    setGoalModalOpen(true)
+  }
+
+  const handleOpenEditGoal = (goal: Goal) => {
+    setEditingGoal(goal)
+    setGoalFuncId(goal.responsibleFunctionId)
+    setGoalMetric(goal.metric)
+    setGoalTarget(goal.target)
+    setGoalPeriodType(goal.periodType)
+    setGoalPeriodStart(goal.periodStart)
+    setGoalPeriodEnd(goal.periodEnd)
+    setGoalStatusVal(goal.status)
+    setGoalModalOpen(true)
+  }
+
+  const handleSaveGoal = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!isOwner) {
+      toast({
+        title: 'Acesso restrito',
+        description: 'Apenas o proprietário (OWNER) pode configurar metas na clínica.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (!goalFuncId) {
+      toast({
+        title: 'Função obrigatória',
+        description: 'Selecione a função responsável pela meta.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (!goalPeriodStart || !goalPeriodEnd) {
+      toast({
+        title: 'Período obrigatório',
+        description: 'Informe as datas de início e término do período da meta.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      if (editingGoal) {
+        await updateGoal(editingGoal.id, {
+          responsible_function_id: goalFuncId,
+          metric: goalMetric,
+          target: Number(goalTarget),
+          period_type: goalPeriodType,
+          period_start: goalPeriodStart,
+          period_end: goalPeriodEnd,
+          status: goalStatusVal,
+        })
+        toast({
+          title: 'Meta atualizada',
+          description: 'A meta e os indicadores da função foram salvos com sucesso.',
+        })
+      } else {
+        await createGoal({
+          responsible_function_id: goalFuncId,
+          metric: goalMetric,
+          target: Number(goalTarget),
+          period_type: goalPeriodType,
+          period_start: goalPeriodStart,
+          period_end: goalPeriodEnd,
+          status: goalStatusVal,
+        })
+        toast({
+          title: 'Meta definida com sucesso',
+          description: 'Nova meta cadastrada e vinculada à função responsável.',
+        })
+      }
+
+      setGoalModalOpen(false)
+      setEditingGoal(null)
+      await loadData()
+    } catch (err: any) {
+      toast({
+        title: 'Falha ao salvar meta',
+        description: err?.message || 'Erro de comunicação com o servidor.',
+        variant: 'destructive',
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleToggleGoalPause = async (goal: Goal) => {
+    if (!isOwner) {
+      toast({
+        title: 'Acesso restrito',
+        description: 'Apenas o proprietário pode pausar ou reativar metas.',
+        variant: 'destructive',
+      })
+      return
+    }
+    const newStatus: GoalStatus = goal.status === 'active' ? 'paused' : 'active'
+    try {
+      await setGoalStatus(goal.id, newStatus)
+      toast({
+        title: newStatus === 'active' ? 'Meta ativada' : 'Meta pausada',
+        description: `A meta "${goal.metricLabel}" agora está ${newStatus === 'active' ? 'ativa' : 'pausada'}.`,
+      })
+      await loadData()
+    } catch (err: any) {
+      toast({
+        title: 'Falha ao alterar status da meta',
+        description: err?.message || 'Erro inesperado.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleDeleteGoal = async (goalId: string) => {
+    if (!confirm('Deseja realmente remover esta meta?')) return
+    try {
+      await deleteGoal(goalId)
+      toast({ title: 'Meta removida com sucesso' })
+      await loadData()
+    } catch (err: any) {
+      toast({
+        title: 'Exclusão não permitida',
+        description: err?.message || 'Apenas o proprietário pode excluir metas.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const toggleGoalDetails = (goalId: string) => {
+    setExpandedGoalDetails((prev) => ({
+      ...prev,
+      [goalId]: !prev[goalId],
+    }))
+  }
+
   // Situações que precisam de atenção (não resolvidas)
   const activeExceptions = useMemo(() => {
     return exceptions.filter((e) => e.status !== 'resolvida')
@@ -727,6 +931,23 @@ export default function Gestao() {
       return true
     })
   }, [actions, searchTerm, filterStatus, filterPerson, filterFunction])
+
+  // Filtragem das Metas & Indicadores
+  const filteredGoals = useMemo(() => {
+    return goals.filter((g) => {
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase()
+        const matchesLabel = g.metricLabel.toLowerCase().includes(term)
+        const matchesFunc = g.responsibleFunctionName?.toLowerCase().includes(term)
+        if (!matchesLabel && !matchesFunc) return false
+      }
+
+      if (filterStatus !== 'all' && g.status !== filterStatus) return false
+      if (filterFunction !== 'all' && g.responsibleFunctionId !== filterFunction) return false
+
+      return true
+    })
+  }, [goals, searchTerm, filterStatus, filterFunction])
 
   return (
     <div className="space-y-6 pb-12">
@@ -878,18 +1099,36 @@ export default function Gestao() {
           </span>
         </button>
 
-        <button
-          onClick={() => setActiveTab('rules')}
-          className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-2 ml-auto ${
-            activeTab === 'rules'
-              ? 'border-teal-700 text-teal-950 font-bold'
-              : 'border-transparent text-slate-400 hover:text-slate-700'
-          }`}
-          title="Regras operacionais e prazos de tolerância da clínica"
-        >
-          <Sliders className="w-3.5 h-3.5" />
-          <span className="text-xs">Regras de Gestão</span>
-        </button>
+        <div className="flex items-center gap-1 ml-auto">
+          <button
+            onClick={() => setActiveTab('goals')}
+            className={`pb-3 px-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'goals'
+                ? 'border-teal-700 text-teal-950 font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+            title="Metas e Indicadores de Execução por Função"
+          >
+            <Target className="w-3.5 h-3.5 text-teal-700" />
+            <span className="text-xs">Metas e Indicadores</span>
+            <span className="text-[11px] px-1.5 py-0.2 rounded-full font-bold bg-teal-100 text-teal-800">
+              {goals.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('rules')}
+            className={`pb-3 px-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'rules'
+                ? 'border-teal-700 text-teal-950 font-bold'
+                : 'border-transparent text-slate-400 hover:text-slate-700'
+            }`}
+            title="Regras operacionais e prazos de tolerância da clínica"
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span className="text-xs">Regras de Gestão</span>
+          </button>
+        </div>
       </div>
 
       {/* Barra de Filtros e Busca Simplificada */}
@@ -986,6 +1225,21 @@ export default function Gestao() {
                 </SelectContent>
               </Select>
             </>
+          )}
+
+          {/* Filtro de Status para Metas */}
+          {activeTab === 'goals' && (
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[140px] h-9 text-xs border-slate-200">
+                <SelectValue placeholder="Status da Meta" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os status</SelectItem>
+                <SelectItem value="active">Ativas</SelectItem>
+                <SelectItem value="paused">Pausadas</SelectItem>
+                <SelectItem value="closed">Encerradas</SelectItem>
+              </SelectContent>
+            </Select>
           )}
 
           {/* Filtro por Função Responsável */}
@@ -1414,6 +1668,293 @@ export default function Gestao() {
                         </button>
                       )}
                     </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SEÇÃO METAS E INDICADORES (Aba integrada ao lado de Regras de Gestão) */}
+      {activeTab === 'goals' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200">
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                <Target className="w-4 h-4 text-teal-700" />
+                Metas e Indicadores por Função
+              </h2>
+              <p className="text-xs text-slate-500">
+                A equipe executa o trabalho, o SKIP mede a execução. Indicadores derivados
+                automaticamente de evidências reais.
+              </p>
+            </div>
+
+            {isOwner && (
+              <Button
+                onClick={handleOpenCreateGoal}
+                size="sm"
+                className="bg-teal-700 hover:bg-teal-800 text-white font-medium text-xs gap-1.5 shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Nova Meta</span>
+              </Button>
+            )}
+          </div>
+
+          {loading ? (
+            <div className="bg-white p-12 text-center rounded-xl border border-slate-200 text-slate-400">
+              Carregando metas e indicadores da equipe...
+            </div>
+          ) : filteredGoals.length === 0 ? (
+            <div className="bg-white p-12 text-center rounded-xl border border-slate-200 space-y-3">
+              <div className="w-12 h-12 rounded-full bg-teal-50 mx-auto flex items-center justify-center text-teal-700">
+                <Target className="w-6 h-6" />
+              </div>
+              <p className="text-base font-semibold text-slate-800">
+                Nenhuma meta cadastrada no momento.
+              </p>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                {isOwner
+                  ? 'Como proprietário, utilize o botão "Nova Meta" acima para definir os indicadores de execução de cada função operacional.'
+                  : 'As metas da equipe são configuradas pela Diretoria (OWNER) e medidas automaticamente pelo sistema.'}
+              </p>
+              {isOwner && (
+                <div className="pt-2">
+                  <Button
+                    onClick={handleOpenCreateGoal}
+                    size="sm"
+                    className="bg-teal-700 hover:bg-teal-800 text-white text-xs gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Cadastrar primeira meta</span>
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredGoals.map((g) => {
+                const isExpanded = !!expandedGoalDetails[g.id]
+                const periodLabel = PERIOD_TYPE_LABELS[g.periodType] || 'Meta'
+                const metricMeta = SUPPORTED_METRICS.find((m) => m.key === g.metric)
+                const isPercentage = metricMeta?.isPercentage ?? false
+                const isPaused = g.status === 'paused'
+
+                let badgeText = 'Sem dados'
+                let badgeClass = 'bg-slate-100 text-slate-700 border-slate-300'
+                if (g.statusBadge === 'within') {
+                  badgeText = 'Dentro da meta'
+                  badgeClass = 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold'
+                } else if (g.statusBadge === 'below') {
+                  badgeText = 'Abaixo da meta'
+                  badgeClass = 'bg-amber-50 text-amber-900 border-amber-300 font-semibold'
+                }
+
+                const actualDisplay = g.actual !== null && g.actual !== undefined ? g.actual : '—'
+                const progressWidth =
+                  g.actual !== null && g.actual !== undefined && g.target > 0
+                    ? Math.min(
+                        100,
+                        Math.max(0, Math.round((Number(g.actual) / Number(g.target)) * 100)),
+                      )
+                    : 0
+
+                return (
+                  <div
+                    key={g.id}
+                    className={`bg-white rounded-xl border p-5 shadow-2xs hover:shadow-md transition flex flex-col justify-between ${
+                      isPaused ? 'border-dashed border-slate-300 opacity-80' : 'border-slate-200'
+                    }`}
+                  >
+                    <div>
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className="inline-flex items-center gap-1 font-bold text-xs px-2.5 py-0.5 rounded-full border"
+                            style={{
+                              backgroundColor: `${g.responsibleFunctionColor}15`,
+                              color: g.responsibleFunctionColor,
+                              borderColor: `${g.responsibleFunctionColor}40`,
+                            }}
+                          >
+                            🏢 {g.responsibleFunctionName}
+                          </span>
+
+                          <span className="text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                            {periodLabel}
+                          </span>
+
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[11px] border ${badgeClass}`}
+                          >
+                            {badgeText}
+                          </span>
+
+                          {isPaused && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                              Pausada
+                            </span>
+                          )}
+                        </div>
+
+                        {g.isMultiMember && (
+                          <span className="text-[11px] text-teal-800 font-medium bg-teal-50 px-2 py-0.5 rounded border border-teal-200">
+                            Corpo Clínico ({g.activeMembersCount || 0} profissionais)
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Header do Card: "CRC Comercial — Meta mensal — Follow-ups realizados — 82/100 — 82%" */}
+                      <div className="mt-3.5 space-y-2">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <h3 className="text-base font-bold text-slate-900 leading-snug">
+                            {g.metricLabel}
+                          </h3>
+                          <div className="text-right whitespace-nowrap">
+                            <span className="text-lg font-extrabold text-slate-900">
+                              {actualDisplay}
+                            </span>
+                            <span className="text-xs text-slate-400 font-medium">
+                              {' '}
+                              / {g.target} {isPercentage ? '%' : ''}
+                            </span>
+                            {g.adherencePct !== null && g.adherencePct !== undefined && (
+                              <span className="ml-1.5 text-xs font-bold text-teal-700">
+                                ({g.adherencePct}%)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Barra de Progresso */}
+                        <div className="space-y-1">
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-300 ${
+                                g.statusBadge === 'within'
+                                  ? 'bg-emerald-600'
+                                  : g.statusBadge === 'below'
+                                    ? 'bg-amber-500'
+                                    : 'bg-slate-300'
+                              }`}
+                              style={{ width: `${progressWidth}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Botão Ver Detalhes (Progressive Disclosure) */}
+                      <div className="mt-4 pt-2 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => toggleGoalDetails(g.id)}
+                          className="text-xs text-teal-800 hover:text-teal-950 font-semibold flex items-center gap-1 py-1"
+                        >
+                          <ChevronRight
+                            className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                          />
+                          <span>{isExpanded ? 'Ocultar detalhes' : 'Ver detalhes da medição'}</span>
+                        </button>
+
+                        {/* Conteúdo Expansível de Detalhes da Medição */}
+                        {isExpanded && (
+                          <div className="mt-2.5 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-2 text-slate-700">
+                            <div className="grid grid-cols-2 gap-2 text-[11px]">
+                              <div>
+                                <span className="text-slate-400 block">Período medido:</span>
+                                <span className="font-semibold text-slate-800">
+                                  {new Date(g.periodStart + 'T00:00:00').toLocaleDateString(
+                                    'pt-BR',
+                                  )}{' '}
+                                  até{' '}
+                                  {new Date(g.periodEnd + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block">Meta acordada:</span>
+                                <span className="font-semibold text-slate-800">
+                                  {g.target} {isPercentage ? '%' : metricMeta?.unit || ''}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block">Realizado no período:</span>
+                                <span className="font-semibold text-slate-800">
+                                  {actualDisplay} {isPercentage ? '%' : metricMeta?.unit || ''}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block">Situação de entrega:</span>
+                                <span className="font-semibold text-slate-800">{badgeText}</span>
+                              </div>
+                            </div>
+
+                            <div className="pt-2 border-t border-slate-200">
+                              <span className="text-slate-500 font-medium block text-[11px]">
+                                Fonte de evidência:
+                              </span>
+                              <p className="text-slate-700 italic mt-0.5 leading-relaxed">
+                                {g.evidenceSource}
+                              </p>
+                            </div>
+
+                            {g.isMultiMember && (
+                              <div className="pt-1 text-[11px] text-teal-800">
+                                ℹ️ Os números apresentados representam a produção e execução
+                                agregada de todos os dentistas da equipe.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Ações do OWNER */}
+                    {isOwner && (
+                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleToggleGoalPause(g)}
+                            className="text-xs h-7 px-2.5 border-slate-300 text-slate-700 hover:bg-slate-50"
+                          >
+                            {isPaused ? (
+                              <>
+                                <Play className="w-3 h-3 mr-1 text-emerald-600" />
+                                Reativar
+                              </>
+                            ) : (
+                              <>
+                                <Pause className="w-3 h-3 mr-1 text-amber-600" />
+                                Pausar
+                              </>
+                            )}
+                          </Button>
+
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenEditGoal(g)}
+                            className="text-xs h-7 px-2.5 text-teal-800 border-teal-300 hover:bg-teal-50"
+                          >
+                            <Edit3 className="w-3 h-3 mr-1" />
+                            Editar
+                          </Button>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteGoal(g.id)}
+                          className="text-xs h-7 px-2 text-red-600 hover:text-red-800 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -1980,6 +2521,168 @@ export default function Gestao() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 5: CRIAR / EDITAR META E INDICADOR (OWNER-ONLY) */}
+      <Dialog open={goalModalOpen} onOpenChange={setGoalModalOpen}>
+        <DialogContent className="sm:max-w-[540px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-900">
+              <Target className="w-5 h-5 text-teal-700" />
+              {editingGoal ? 'Editar Meta e Indicador' : 'Nova Meta por Função'}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              {editingGoal
+                ? 'Ajuste os parâmetros de medição e meta acordada para a função.'
+                : 'Defina a meta de execução para a função. O SKIP medirá automaticamente a entrega a partir das evidências operacionais.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveGoal} className="space-y-4 pt-2">
+            {/* Função Responsável */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Função Responsável *</Label>
+              <Select value={goalFuncId} onValueChange={setGoalFuncId}>
+                <SelectTrigger className="w-full text-xs">
+                  <SelectValue placeholder="Selecione a função" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Indicador / Métrica */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Indicador Medido *</Label>
+              <Select
+                value={goalMetric}
+                onValueChange={(val) => setGoalMetric(val as GoalMetricKey)}
+              >
+                <SelectTrigger className="w-full text-xs">
+                  <SelectValue placeholder="Selecione o indicador" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_METRICS.map((m) => (
+                    <SelectItem key={m.key} value={m.key}>
+                      {m.label} ({m.unit})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {(() => {
+                const cur = SUPPORTED_METRICS.find((m) => m.key === goalMetric)
+                return cur ? (
+                  <p className="text-[11px] text-slate-500 italic bg-slate-50 p-2 rounded border border-slate-100">
+                    {cur.description}
+                  </p>
+                ) : null
+              })()}
+            </div>
+
+            {/* Meta (Target) e Periodicidade */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Meta Alvo *</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={goalTarget}
+                  onChange={(e) => setGoalTarget(parseFloat(e.target.value) || 0)}
+                  placeholder="Ex: 50"
+                  className="text-xs"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Periodicidade *</Label>
+                <Select
+                  value={goalPeriodType}
+                  onValueChange={(val) => setGoalPeriodType(val as GoalPeriodType)}
+                >
+                  <SelectTrigger className="w-full text-xs">
+                    <SelectValue placeholder="Selecione o período" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Diária</SelectItem>
+                    <SelectItem value="weekly">Semanal</SelectItem>
+                    <SelectItem value="monthly">Mensal</SelectItem>
+                    <SelectItem value="custom">Personalizada</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Período: Início e Fim */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Início do Período *</Label>
+                <Input
+                  type="date"
+                  value={goalPeriodStart}
+                  onChange={(e) => setGoalPeriodStart(e.target.value)}
+                  className="text-xs"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Fim do Período *</Label>
+                <Input
+                  type="date"
+                  value={goalPeriodEnd}
+                  onChange={(e) => setGoalPeriodEnd(e.target.value)}
+                  className="text-xs"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Status (ativo / pausado / encerrado) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Situação da Meta</Label>
+              <Select
+                value={goalStatusVal}
+                onValueChange={(val) => setGoalStatusVal(val as GoalStatus)}
+              >
+                <SelectTrigger className="w-full text-xs">
+                  <SelectValue placeholder="Situação" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Ativa (em medição)</SelectItem>
+                  <SelectItem value="paused">Pausada</SelectItem>
+                  <SelectItem value="closed">Encerrada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DialogFooter className="pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setGoalModalOpen(false)}
+                className="text-xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={submitting}
+                className="bg-teal-700 hover:bg-teal-800 text-white text-xs"
+              >
+                {submitting ? 'Salvando...' : editingGoal ? 'Salvar Alterações' : 'Criar Meta'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
