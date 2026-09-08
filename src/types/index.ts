@@ -405,7 +405,7 @@ export interface DerivedPendingItem {
   responsiblePersonName?: string | null
   managementDecisionRequired: boolean
   severity: 'baixa' | 'media' | 'alta' | 'critica'
-  sourceType: 'task' | 'agenda_item' | 'lead' | 'function'
+  sourceType: 'task' | 'agenda_item' | 'lead' | 'function' | 'post_sale'
   sourceId: string
   daysOverdue?: number
 }
@@ -424,6 +424,109 @@ export type GoalMetricKey =
   | 'followups_overdue'
   | 'management_actions_completed'
   | 'management_actions_overdue'
+  | 'post_sales_completed'
+  | 'post_sales_overdue'
+  | 'referrals_generated'
+  | 'referred_leads'
+
+// -------------------------------------------------------------------------
+// STAGE 4G: POST-SALE & REFERRAL TYPES
+// -------------------------------------------------------------------------
+
+export type PostSaleStatus =
+  | 'previsto'
+  | 'contatado'
+  | 'reagendado'
+  | 'sem_resposta'
+  | 'insatisfeito'
+
+export type PostSaleOutcome = 'satisfeito' | 'insatisfeito' | 'sem_resposta' | 'reagendado'
+
+export interface ReferralCampaign {
+  id: string
+  organizationId: string
+  name: string
+  description: string
+  active: boolean
+  startDate?: string | null
+  endDate?: string | null
+  rewardConfig: {
+    reward_type?: string
+    benefit_label?: string
+    referred_benefit?: string
+    discount_pct?: number
+    bonus_value?: number
+    [key: string]: any
+  }
+  instructionsScript: string
+  createdBy?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PostSale {
+  id: string
+  organizationId: string
+  treatmentId: string
+  patientLeadId: string
+  patientName?: string
+  patientPhone?: string
+  treatmentName?: string
+  treatmentCompletedAt?: string
+  dueDate: string // YYYY-MM-DD (T+30)
+  status: PostSaleStatus
+  outcome?: PostSaleOutcome | null
+  contactNotes?: string | null
+  dissatisfactionReason?: string | null
+  dissatisfactionStatus?: 'pendente' | 'em_resolucao' | 'resolvido' | null
+  dissatisfactionResolution?: string | null
+  dissatisfactionResolvedAt?: string | null
+  dissatisfactionResolvedBy?: string | null
+  dissatisfactionResolvedByName?: string | null
+  contactedAt?: string | null
+  contactedByPersonId?: string | null
+  contactedByPersonName?: string | null
+  responsibleFunctionId?: string | null
+  responsibleFunctionName?: string | null
+  campaignIdPresented?: string | null
+  campaignNamePresented?: string | null
+  campaignSnapshot?: any | null
+  nextContactAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Referral {
+  id: string
+  organizationId: string
+  sourceLeadId: string
+  sourceLeadName?: string
+  sourceTreatmentId?: string | null
+  postSaleId?: string | null
+  campaignId?: string | null
+  campaignName?: string | null
+  referredName: string
+  referredPhone: string
+  referredNotes?: string | null
+  resultingLeadId?: string | null
+  resultingLeadStage?: LeadStage | null
+  registeredByPersonId?: string | null
+  registeredByPersonName?: string | null
+  registeredAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Treatment {
+  id: string
+  organizationId: string
+  leadId: string
+  leadName?: string
+  name: string
+  status: 'em_andamento' | 'concluido' | 'cancelado'
+  completedAt?: string | null
+  createdAt: string
+}
 
 export type GoalPeriodType = 'daily' | 'weekly' | 'monthly' | 'custom'
 

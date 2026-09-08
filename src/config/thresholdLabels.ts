@@ -52,6 +52,14 @@ export const THRESHOLD_LABELS: Record<string, ThresholdHumanConfig> = {
     unitLabel: (val) => (val === 1 ? 'unidade' : 'unidades'),
     example: 'Ex.: 5 unidades',
   },
+  post_sale_delay_tolerance_days: {
+    key: 'post_sale_delay_tolerance_days',
+    label: 'Tolerância de atraso no pós-venda T+30',
+    description:
+      'Dias de tolerância após vencimento de T+30 antes de alertar gestão por atraso no pós-venda',
+    unitLabel: (val) => (val === 1 ? 'dia' : 'dias'),
+    example: 'Ex.: 3 dias',
+  },
 }
 
 export function getHumanThresholdInfo(key: string): ThresholdHumanConfig {

@@ -34,6 +34,7 @@ import type {
   ExceptionStatus,
 } from '@/types'
 import { getHumanThresholdInfo } from '@/config/thresholdLabels'
+import { GestaoPostSaleView } from '@/components/GestaoPostSaleView'
 import {
   ShieldAlert,
   Lock,
@@ -201,7 +202,18 @@ const EXCEPTION_STATUS_CONFIG: Record<ExceptionStatus, { label: string; badgeCla
 }
 
 export default function Gestao() {
-  const { isOwner, roles, collaborators, agendaItems, leads, tasks } = useApp()
+  const {
+    isOwner,
+    roles,
+    collaborators,
+    agendaItems,
+    leads,
+    tasks,
+    postSales,
+    referrals,
+    referralCampaigns,
+    refreshPostSales,
+  } = useApp()
   const { toast } = useToast()
 
   // Seções primárias da tela operacional na ordem requerida:
@@ -210,10 +222,11 @@ export default function Gestao() {
   // 3. AÇÕES DE GESTÃO ('actions')
   // 4. FEEDBACKS E ORIENTAÇÕES ('feedback')
   // Secundárias:
+  // - Pós-Venda & Campanhas ('post_sale')
   // - Metas e Indicadores ('goals')
   // - Regras de Gestão ('rules')
   const [activeTab, setActiveTab] = useState<
-    'attention' | 'pending' | 'actions' | 'feedback' | 'rules' | 'goals'
+    'attention' | 'pending' | 'actions' | 'feedback' | 'rules' | 'goals' | 'post_sale'
   >('attention')
 
   const [items, setItems] = useState<ManagementItem[]>([])
@@ -299,7 +312,7 @@ export default function Gestao() {
     return map
   }, [thresholds])
 
-  // Pendências do dia computadas em tempo real
+  // Pendências do dia computadas em tempo real (incluindo pós-venda)
   const derivedPending = useMemo(() => {
     return derivePendingItems(
       {
@@ -309,10 +322,11 @@ export default function Gestao() {
         roles,
         collaborators,
         activeAssignments: [],
+        postSales,
       },
       thresholdsObj,
     )
-  }, [agendaItems, leads, tasks, roles, collaborators, thresholdsObj])
+  }, [agendaItems, leads, tasks, roles, collaborators, postSales, thresholdsObj])
 
   // Sincronização automática e silenciosa de pendências para a base de situações
   const runAutoSync = useCallback(
@@ -373,6 +387,8 @@ export default function Gestao() {
             leads,
             managedExceptions: dbExceptions,
             managementActions: dbActions,
+            postSales,
+            referrals,
           },
         }),
       )
@@ -1100,6 +1116,22 @@ export default function Gestao() {
         </button>
 
         <div className="flex items-center gap-1 ml-auto">
+          <button
+            onClick={() => setActiveTab('post_sale')}
+            className={`pb-3 px-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'post_sale'
+                ? 'border-teal-700 text-teal-950 font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+            title="Visão Agregada de Pós-Venda e Gestão de Campanhas de Indicação"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-teal-700" />
+            <span className="text-xs">Pós-Venda & Campanhas</span>
+            <span className="text-[11px] px-1.5 py-0.2 rounded-full font-bold bg-teal-100 text-teal-800">
+              {postSales.length}
+            </span>
+          </button>
+
           <button
             onClick={() => setActiveTab('goals')}
             className={`pb-3 px-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap flex items-center gap-1.5 ${
@@ -2099,6 +2131,20 @@ export default function Gestao() {
             </div>
           )}
         </div>
+      )}
+
+      {/* SEÇÃO SECUNDÁRIA: PÓS-VENDA & GESTÃO DE CAMPANHAS (STAGE 4G) */}
+      {activeTab === 'post_sale' && (
+        <GestaoPostSaleView
+          postSales={postSales}
+          referrals={referrals}
+          campaigns={referralCampaigns}
+          isOwner={isOwner}
+          onRefresh={async () => {
+            await refreshPostSales()
+            await loadData()
+          }}
+        />
       )}
 
       {/* SEÇÃO SECUNDÁRIA: REGRAS DE GESTÃO (DISCLOSURE PROGRESSIVO) */}

@@ -97,6 +97,12 @@ export const DEFAULT_THRESHOLDS: Record<
     unit: 'unidades',
     description: 'Quantidade mínima de itens críticos antes de gerar exceção operacional',
   },
+  post_sale_delay_tolerance_days: {
+    value: 3,
+    unit: 'dias',
+    description:
+      'Dias de tolerância após vencimento de T+30 antes de alertar gestão por atraso no pós-venda',
+  },
 }
 
 export async function fetchThresholdConfigs(): Promise<OrgThresholdConfig[]> {
@@ -305,6 +311,7 @@ export interface OperationalDatasets {
   roles: any[]
   collaborators: any[]
   activeAssignments: any[]
+  postSales?: any[]
 }
 
 /**
@@ -459,6 +466,81 @@ export function derivePendingItems(
         sourceId: lead.id,
         daysOverdue,
       })
+    }
+  }
+
+  // 3. Pós-Venda (Stage 4G): Pós-venda atrasado além da tolerância E insatisfações abertas
+  const postSales = datasets.postSales || []
+  const postSaleDelayTolerance = thresholds.post_sale_delay_tolerance_days ?? 3
+
+  for (const ps of postSales) {
+    // 3a. Insatisfação do Paciente ABERTA (não resolvida)
+    if (ps.outcome === 'insatisfeito' && ps.dissatisfactionStatus !== 'resolvido') {
+      const crcFuncId =
+        ps.responsibleFunctionId || roles.find((r: any) => r.name === 'CRC Comercial')?.id || 'none'
+      const crcFuncName = rolesMap.get(crcFuncId) || 'CRC Comercial'
+
+      derived.push({
+        id: `pending-postsale-dissatisfaction-${ps.id}`,
+        category: 'gestao',
+        title: `Insatisfação pós-venda: ${ps.patientName || 'Paciente'} (${ps.treatmentName || 'Tratamento'})`,
+        expectedDate: ps.dueDate,
+        actualState: 'Insatisfação registrada aguardando resolução',
+        reason: ps.dissatisfactionReason
+          ? `Paciente relatou: "${ps.dissatisfactionReason}". Exige alinhamento com a gestão.`
+          : 'Paciente relatou insatisfação no contato de 30 dias. Exige intervenção.',
+        responsibleFunctionId: crcFuncId,
+        responsibleFunctionName: crcFuncName,
+        responsiblePersonId: ps.contactedByPersonId || null,
+        responsiblePersonName: ps.contactedByPersonName || null,
+        managementDecisionRequired: true,
+        severity: 'alta',
+        sourceType: 'post_sale',
+        sourceId: ps.id,
+        daysOverdue: 0,
+      })
+    }
+
+    // 3b. Pós-venda T+30 atrasado além da tolerância
+    if (
+      (ps.status === 'previsto' || ps.status === 'reagendado' || ps.status === 'sem_resposta') &&
+      ps.dueDate < todayIso
+    ) {
+      const daysOverdue = Math.max(
+        0,
+        Math.floor(
+          (new Date(todayIso + 'T00:00:00').getTime() -
+            new Date(ps.dueDate + 'T00:00:00').getTime()) /
+            (1000 * 60 * 60 * 24),
+        ),
+      )
+
+      const exceedsTolerance = daysOverdue >= postSaleDelayTolerance
+      if (exceedsTolerance) {
+        const crcFuncId =
+          ps.responsibleFunctionId ||
+          roles.find((r: any) => r.name === 'CRC Comercial')?.id ||
+          'none'
+        const crcFuncName = rolesMap.get(crcFuncId) || 'CRC Comercial'
+
+        derived.push({
+          id: `pending-postsale-overdue-${ps.id}`,
+          category: 'gestao',
+          title: `Pós-venda T+30 atrasado: ${ps.patientName || 'Paciente'} (${ps.treatmentName || 'Tratamento'})`,
+          expectedDate: ps.dueDate,
+          actualState: 'Contato T+30 não realizado',
+          reason: `Contato de satisfação pós-término atrasado há ${daysOverdue} dia(s) (tolerância: ${postSaleDelayTolerance}d).`,
+          responsibleFunctionId: crcFuncId,
+          responsibleFunctionName: crcFuncName,
+          responsiblePersonId: null,
+          responsiblePersonName: null,
+          managementDecisionRequired: true,
+          severity: daysOverdue >= 7 ? 'critica' : 'alta',
+          sourceType: 'post_sale',
+          sourceId: ps.id,
+          daysOverdue,
+        })
+      }
     }
   }
 

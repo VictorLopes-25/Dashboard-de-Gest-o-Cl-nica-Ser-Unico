@@ -1,2 +1,2 @@
-export const APP_VERSION = '0.0.30'
-export const APP_BUILD_DATE = new Date().toISOString()
+export const APP_VERSION = 'v0.0.31'
+export const APP_BUILD_DATE = '2026-09-08'

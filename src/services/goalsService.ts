@@ -131,6 +131,37 @@ export const SUPPORTED_METRICS: Array<{
     evidenceSource: 'Ações de gestão pendentes cujo prazo limite acordado foi ultrapassado.',
     lowerIsBetter: true,
   },
+  {
+    key: 'post_sales_completed',
+    label: 'Pós-vendas realizados',
+    unit: 'contatos',
+    description: 'Contatos de pós-venda T+30 com satisfação do paciente avaliada e registrada.',
+    evidenceSource: 'Contatos de pós-venda T+30 executados e com satisfação registrada no período.',
+  },
+  {
+    key: 'post_sales_overdue',
+    label: 'Pós-vendas em atraso',
+    unit: 'contatos',
+    description: 'Pós-vendas T+30 com prazo vencido ainda pendentes de contato pela equipe.',
+    evidenceSource: 'Contatos de pós-venda T+30 pendentes com prazo vencido.',
+    lowerIsBetter: true,
+  },
+  {
+    key: 'referrals_generated',
+    label: 'Indicações geradas',
+    unit: 'indicações',
+    description: 'Novas indicações de amigos e familiares geradas através do pós-venda.',
+    evidenceSource:
+      'Novas indicações de pacientes registradas no período através das campanhas de pós-venda.',
+  },
+  {
+    key: 'referred_leads',
+    label: 'Leads por indicação',
+    unit: 'leads',
+    description: 'Leads integrados diretamente no CRM originados de indicações de pacientes.',
+    evidenceSource:
+      'Leads registrados no CRM originados diretamente de indicações geradas no pós-venda.',
+  },
 ]
 
 export const PERIOD_TYPE_LABELS: Record<GoalPeriodType, string> = {
@@ -310,6 +341,19 @@ export function deriveGoalMetricClientSide(
       completedAt?: string | null
       updatedAt: string
     }>
+    postSales?: Array<{
+      id: string
+      dueDate: string
+      status: string
+      outcome?: string | null
+      contactedAt?: string | null
+      responsibleFunctionId?: string | null
+    }>
+    referrals?: Array<{
+      id: string
+      registeredAt: string
+      resultingLeadId?: string | null
+    }>
   },
   todayIso: string = new Date().toISOString().slice(0, 10),
 ): { actual: number; evidenceSource: string } {
@@ -422,6 +466,47 @@ export function deriveGoalMetricClientSide(
       return { actual: count, evidenceSource: defaultEvidence }
     }
 
+    case 'post_sales_completed': {
+      const { postSales = [] } = context
+      const count = postSales.filter((ps) => {
+        if (ps.responsibleFunctionId && ps.responsibleFunctionId !== funcId) return false
+        if (!ps.outcome) return false
+        const date = ps.contactedAt ? ps.contactedAt.slice(0, 10) : ''
+        return date >= start && date <= end
+      }).length
+      return { actual: count, evidenceSource: defaultEvidence }
+    }
+
+    case 'post_sales_overdue': {
+      const { postSales = [] } = context
+      const count = postSales.filter((ps) => {
+        if (ps.responsibleFunctionId && ps.responsibleFunctionId !== funcId) return false
+        if (ps.status !== 'previsto' && ps.status !== 'sem_resposta' && ps.status !== 'reagendado')
+          return false
+        return ps.dueDate >= start && ps.dueDate <= end && ps.dueDate < todayIso
+      }).length
+      return { actual: count, evidenceSource: defaultEvidence }
+    }
+
+    case 'referrals_generated': {
+      const { referrals = [] } = context
+      const count = referrals.filter((r) => {
+        const date = r.registeredAt ? r.registeredAt.slice(0, 10) : ''
+        return date >= start && date <= end
+      }).length
+      return { actual: count, evidenceSource: defaultEvidence }
+    }
+
+    case 'referred_leads': {
+      const { referrals = [] } = context
+      const count = referrals.filter((r) => {
+        if (!r.resultingLeadId) return false
+        const date = r.registeredAt ? r.registeredAt.slice(0, 10) : ''
+        return date >= start && date <= end
+      }).length
+      return { actual: count, evidenceSource: defaultEvidence }
+    }
+
     default:
       return { actual: 0, evidenceSource: defaultEvidence }
   }
@@ -444,6 +529,8 @@ export function enrichGoalForUi(
       leadContacts?: any[]
       managedExceptions?: any[]
       managementActions?: any[]
+      postSales?: any[]
+      referrals?: any[]
     }
   },
 ): Goal {

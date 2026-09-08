@@ -75,6 +75,8 @@ import {
   deleteScript as deleteScriptService,
   type DbScript,
 } from '@/services/scriptsService'
+import { fetchPostSales, fetchReferrals, fetchReferralCampaigns } from '@/services/postSaleService'
+import type { PostSale, Referral, ReferralCampaign } from '@/types'
 
 export type { AuthUser }
 
@@ -461,6 +463,12 @@ interface AppContextType {
     lossReason?: string | null
   }) => Promise<void>
 
+  // Pós-Venda & Indicações (Stage 4G)
+  postSales: PostSale[]
+  referrals: Referral[]
+  referralCampaigns: ReferralCampaign[]
+  refreshPostSales: () => Promise<void>
+
   // Reset / Refresh
   refreshData: () => Promise<void>
   resetData: () => Promise<void>
@@ -494,6 +502,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [leads, setLeads] = useState<Lead[]>([])
   const [scripts, setScripts] = useState<Script[]>([])
   const [contactHistory, setContactHistory] = useState<ContactHistoryItem[]>([])
+  const [postSales, setPostSales] = useState<PostSale[]>([])
+  const [referrals, setReferrals] = useState<Referral[]>([])
+  const [referralCampaigns, setReferralCampaigns] = useState<ReferralCampaign[]>([])
 
   const isOwner = useMemo(() => {
     return currentUser?.isOwner === true || resolvedPerson?.org_role === 'OWNER'
@@ -559,6 +570,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // ----------------------------------------------------------------
   // Carregamento dos dados estruturais (Supabase como fonte da verdade)
   // ----------------------------------------------------------------
+
+  const refreshPostSales = useCallback(async () => {
+    try {
+      const [psData, refData, campData] = await Promise.all([
+        fetchPostSales().catch(() => [] as PostSale[]),
+        fetchReferrals().catch(() => [] as Referral[]),
+        fetchReferralCampaigns().catch(() => [] as ReferralCampaign[]),
+      ])
+      setPostSales(psData)
+      setReferrals(refData)
+      setReferralCampaigns(campData)
+    } catch (err) {
+      console.warn('Erro ao carregar pós-vendas no refreshPostSales:', err)
+    }
+  }, [])
 
   const refreshData = useCallback(async () => {
     // Se não há usuário autenticado com pessoa resolvida, não tenta carregar tabelas protegidas
@@ -676,6 +702,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         mapDbContactToUi(c, peopleNamesMap, roleNamesMap),
       )
       setContactHistory(mappedContacts)
+
+      // 9. Carregar Pós-Venda, Indicações e Campanhas (Stage 4G)
+      const [postSalesData, referralsData, campaignsData] = await Promise.all([
+        fetchPostSales().catch(() => [] as PostSale[]),
+        fetchReferrals().catch(() => [] as Referral[]),
+        fetchReferralCampaigns().catch(() => [] as ReferralCampaign[]),
+      ])
+      setPostSales(postSalesData)
+      setReferrals(referralsData)
+      setReferralCampaigns(campaignsData)
     } catch (err) {
       console.error('Erro crítico ao carregar dados do Supabase:', err)
       // Conforme Regra de ouro: NÃO fazer fallback silencioso para mocks. Erros claramente sinalizados.
@@ -1568,6 +1604,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteScript,
         addContactHistory,
         registerLeadContactFlow,
+        postSales,
+        referrals,
+        referralCampaigns,
+        refreshPostSales,
         refreshData,
         resetData,
       }}
