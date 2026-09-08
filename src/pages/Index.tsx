@@ -53,12 +53,12 @@ export default function Index() {
   // Contextual role selection when authenticated
   const [selectedRoleId, setSelectedRoleId] = useState('')
 
-  // Redireciona para /dashboard se já estiver autenticado e com função definida
+  // Redireciona para /dashboard se já estiver autenticado com pessoa ativa
   useEffect(() => {
-    if (user && resolvedPerson && resolvedPerson.active && currentUser) {
-      navigate('/dashboard')
+    if (user && resolvedPerson?.active) {
+      navigate('/dashboard', { replace: true })
     }
-  }, [user, resolvedPerson, currentUser, navigate])
+  }, [user, resolvedPerson, navigate])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -177,7 +177,7 @@ export default function Index() {
               <h1 className="text-2xl lg:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
                 Ser Único
                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-500/30 text-teal-200 border border-teal-400/30">
-                  ERP + CRM Seguro
+                  ERP + CRM v0.0.19
                 </span>
               </h1>
               <p className="text-teal-200 text-sm font-medium">
@@ -261,11 +261,21 @@ export default function Index() {
             </div>
           </div>
 
-          {/* ESTADO 1: Loading da sessão */}
+          {/* ESTADO 1: Loading da sessão ou Transição pós-login */}
           {authLoading ? (
             <div className="py-12 flex flex-col items-center justify-center text-slate-500 space-y-3">
               <Loader2 className="w-8 h-8 animate-spin text-teal-700" />
               <p className="text-xs">Verificando credenciais e permissões...</p>
+            </div>
+          ) : user && resolvedPerson?.active ? (
+            <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center shadow-xs">
+                <Loader2 className="w-6 h-6 animate-spin text-teal-700" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">Autenticado com sucesso</h3>
+                <p className="text-xs text-slate-500 mt-1">Redirecionando para o Dashboard...</p>
+              </div>
             </div>
           ) : isInactivePerson ? (
             /* ESTADO 2: Pessoa Inativa */

@@ -607,7 +607,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (userAssignments.length > 0) {
             activeRoleId = userAssignments[0]
           } else {
-            // Se OWNER ou sem assignment específico, usa a primeira função disponível (ou Gerência)
+            // Se OWNER ou sem assignment específico, usa a função "Gerência" ou primeira função disponível
             const defaultRole =
               mappedRoles.find((r) => r.name.toLowerCase().includes('gerência')) || mappedRoles[0]
             activeRoleId = defaultRole?.id || ''
@@ -623,7 +623,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           orgRole: resolvedPerson.org_role,
           isOwner: isOwnerRole,
           roleId: activeRoleId || '',
-          roleName: currentRole?.name || 'Colaborador',
+          roleName: currentRole?.name || (isOwnerRole ? 'Gerência' : 'Colaborador'),
           roleColor: currentRole?.color || '#0F766E',
           allowedRoleIds: userAssignments,
         }
@@ -677,7 +677,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [authUser, resolvedPerson])
 
   useEffect(() => {
     if (authUser && resolvedPerson) {

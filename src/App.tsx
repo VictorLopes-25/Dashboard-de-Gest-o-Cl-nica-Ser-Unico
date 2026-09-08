@@ -4,6 +4,7 @@ import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/context/AuthContext'
 import { AppProvider } from '@/context/AppContext'
+import Layout from '@/components/Layout'
 
 import Login from './pages/Login'
 import Index from './pages/Index'
@@ -32,17 +33,19 @@ const App = () => (
 
             {/* Rotas autenticadas (o AppContext exige sessão válida) */}
             <Route path="/" element={<Index />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/agenda" element={<Agenda />} />
-            <Route path="/tarefas" element={<Tarefas />} />
-            <Route path="/crc" element={<CrcWorkspace />} />
-            <Route path="/crm" element={<Leads />} />
-            <Route path="/crm/leads/:id" element={<LeadDetail />} />
-            <Route path="/crm/scripts" element={<Scripts />} />
-            <Route path="/cadastros/funcoes" element={<Funcoes />} />
-            <Route path="/gestao" element={<Gestao />} />
-            <Route path="/cadastros/colaboradores" element={<Colaboradores />} />
-            <Route path="/cadastros/dentistas" element={<Dentistas />} />
+            <Route element={<Layout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/agenda" element={<Agenda />} />
+              <Route path="/tarefas" element={<Tarefas />} />
+              <Route path="/crc" element={<CrcWorkspace />} />
+              <Route path="/crm" element={<Leads />} />
+              <Route path="/crm/leads/:id" element={<LeadDetail />} />
+              <Route path="/crm/scripts" element={<Scripts />} />
+              <Route path="/cadastros/funcoes" element={<Funcoes />} />
+              <Route path="/gestao" element={<Gestao />} />
+              <Route path="/cadastros/colaboradores" element={<Colaboradores />} />
+              <Route path="/cadastros/dentistas" element={<Dentistas />} />
+            </Route>
 
             <Route path="*" element={<NotFound />} />
           </Routes>

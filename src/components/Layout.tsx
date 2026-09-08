@@ -85,8 +85,23 @@ export default function Layout() {
   const userInitial = currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'U'
 
   // If user is on login page or not logged in and on root, render just Outlet
-  if (location.pathname === '/' || !currentUser) {
+  if (location.pathname === '/') {
     return <Outlet />
+  }
+
+  // Se o currentUser ainda está carregando nas rotas protegidas
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#F6F8F7] text-slate-500 space-y-4">
+        <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center shadow-xs">
+          <Sparkles className="w-6 h-6 text-teal-700 animate-pulse" />
+        </div>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-slate-700">Carregando painel institucional...</p>
+          <p className="text-xs text-slate-400 mt-0.5">Sincronizando permissões e funções</p>
+        </div>
+      </div>
+    )
   }
 
   const navGroups = [
